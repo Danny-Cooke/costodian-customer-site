@@ -269,6 +269,7 @@ resource "aws_cognito_user_pool" "this" {
     invite_message_template {
       email_subject = local.messages["invite"]["subject"]
       email_message = local.messages["invite"]["message"]
+      sms_message   = local.messages["invite"]["sms"]
     }
   }
 

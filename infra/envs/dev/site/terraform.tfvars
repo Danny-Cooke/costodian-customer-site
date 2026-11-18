@@ -118,7 +118,10 @@ temporary_password_validity_days = 7
 # The two emails the pool sends. {product}, {site_url} and {days} are put in by
 # the account module; {username} and {####} are Cognito's own and are required
 # in these messages, so they are left as they are written here.
+# No invitation is sent by text message: no phone number is held. The sign-in
+# service still requires the wording to exist.
 invite_message_template = {
+  sms     = "{product}: sign in as {username} with the temporary password {####}"
   subject = "You have been invited to {product}"
   message = "You have been invited to help manage your firm's {product} account.<br><br>Sign in at {site_url}/signin/ with:<br><br>Email address: {username}<br>Temporary password: {####}<br><br>You will be asked to choose your own password the first time you sign in. The temporary password stops working after {days} days."
 }
