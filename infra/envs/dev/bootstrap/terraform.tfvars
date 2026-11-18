@@ -365,7 +365,7 @@ service_roles = {
       http_apis = {
         resources     = ["http_apis"]
         read_actions  = ["apigateway:GET"]
-        write_actions = ["apigateway:DELETE", "apigateway:PATCH", "apigateway:POST", "apigateway:PUT"]
+        write_actions = ["apigateway:DELETE", "apigateway:PATCH", "apigateway:POST", "apigateway:PUT", "apigateway:TagResource", "apigateway:UntagResource"]
       }
       # Giving the API stage a CloudWatch destination makes a log delivery and
       # a resource policy on the log group. Neither call accepts a resource.
