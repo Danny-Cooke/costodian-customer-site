@@ -1,0 +1,13 @@
+// Viewer-request function. The site is built as one folder per page, so a
+// request for /pricing/ or /pricing is answered with /pricing/${index_document}.
+// A path whose last segment has a dot in it is a file and is left alone.
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri.endsWith('/')) {
+    request.uri = uri + '${index_document}';
+  } else if (uri.lastIndexOf('.') < uri.lastIndexOf('/')) {
+    request.uri = uri + '/${index_document}';
+  }
+  return request;
+}

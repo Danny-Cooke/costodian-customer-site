@@ -1,0 +1,34 @@
+# Built output
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node (test tooling only)
+node_modules/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+# A local-backend override used only for the first bootstrap run and for local plans.
+*_override.tf
+
+# Claude Code personal overrides
+.claude/settings.local.json
+.claude/auto-memory/
+
+# Local
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+build/
+dist-live/

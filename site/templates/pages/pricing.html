@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">You pay for each bill the product drafts, whether the case is legally aided or privately funded.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <div class="price-card">
+      <h2>Per drafted bill</h2>
+      {% if site.pricing.per_bill is not none %}
+      <p class="price"><span class="amount">{{ site.pricing.currency_symbol }}{{ site.pricing.per_bill }}</span> a bill, plus VAT</p>
+      {% else %}
+      <p class="price"><span class="amount">Price to be confirmed</span></p>
+      <p>We will publish the price here before sign-up opens.</p>
+      {% endif %}
+      <h3>Included with every bill</h3>
+      <ul class="ticks">
+        <li>The drafted bill of costs as a Word document</li>
+        <li>The report showing the rule, the working and the evidence for every line</li>
+        <li>An independent check of the draft before you see it</li>
+        <li>As many redrafts of the same case as you need before you approve it</li>
+        <li>The record of who confirmed the facts and who approved the bill</li>
+      </ul>
+      <p class="actions"><a class="button large" href="{{ routes.signup }}">{{ pages.signup.label }}</a></p>
+    </div>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap narrow">
+    <h2>Questions</h2>
+    <dl class="faq">
+      <dt>When do I pay?</dt>
+      {% if site.pricing.payment_enabled %}
+      <dd>Payment details are taken when you sign up, on our payment provider's own page. We never see or store card numbers.</dd>
+      {% else %}
+      <dd>Not yet. Sign-up is free while {{ site.product.name }} is in preview, and no payment details are asked for.</dd>
+      {% endif %}
+      <dt>What happens after I sign up?</dt>
+      <dd>You sign in and complete your account: your firm's company information, and the {{ site.agreement.title|lower }}. Your firm's account is then created and you can upload your first case.</dd>
+      {% if site.pricing.refund_days is not none %}
+      <dt>Can I get a refund?</dt>
+      <dd>Yes, if you ask within {{ site.pricing.refund_days }} days of signing up.</dd>
+      {% endif %}
+      <dt>Which cases can it draft?</dt>
+      <dd>Legally aided and privately funded work, at the same price. See <a href="{{ routes.how }}">{{ pages.how.label|lower }}</a> for what is covered.</dd>
+      <dt>How long are our files kept?</dt>
+      <dd>For {{ site.retention.years }} years after a case is completed, then deleted. See <a href="{{ routes.security }}">{{ pages.security.label|lower }}</a>.</dd>
+    </dl>
+  </div>
+</section>
+{% endblock %}

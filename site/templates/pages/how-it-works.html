@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">Four steps from the case files to an approved bill of costs. The same steps for legally aided and privately funded work.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <ol class="steps">
+      <li>
+        <h2>Upload the case files</h2>
+        <p>Emails, letters, attendance notes, court orders, invoices and scanned or handwritten pages, as they are. There is nothing to sort, rename or re-type. Your original files are never changed.</p>
+      </li>
+      <li>
+        <h2>{{ site.product.name }} drafts the bill</h2>
+        <p>Within minutes, the files are read in full and the chargeable work is identified, priced and set out as a bill of costs: under the Legal Aid Agency's rates and rules for legally aided work, or under your firm's own rates and terms for privately funded work.</p>
+      </li>
+      <li>
+        <h2>You review it</h2>
+        <p>You see every line with the document it came from and the rule or rate that priced it, together with anything the files left open. You confirm, correct or add to it. Any figure you change is shown as yours.</p>
+      </li>
+      <li>
+        <h2>You approve and download</h2>
+        <p>Once a named person at your firm approves the bill, it is released as a Word document, with a report of the working behind it and a record of who did what.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap narrow">
+    <h2>Set up once for the whole firm</h2>
+    <p>Your firm's rates, fee earners and billing positions are entered once and managed centrally by the people you choose. Every case then follows them, and a change is recorded with who made it and when.</p>
+
+    <h2>Every case kept in one place</h2>
+    <p>Each case has its own secure store: the files you uploaded, every draft, the approved bill and the record of who did what, kept for {{ site.retention.years }} years after the case is completed. One list shows where every bill stands, from uploaded to approved.</p>
+
+    <h2>Access given case by case</h2>
+    <p>Your firm decides who works on each case and in what role. A person sees only the cases they have been given, which keeps each client's file with the people who need it.</p>
+
+    <h2>What it covers</h2>
+    <ul class="plain">
+      <li><strong>Legally aided work:</strong> civil legal aid in family law to begin with, at hourly rates or a standard fee.</li>
+      <li><strong>Privately funded work:</strong> bills to your own client at your firm's rates and agreed terms.</li>
+    </ul>
+
+    <h2>What stays with you</h2>
+    <ul class="plain">
+      <li>The decision to approve a bill, and responsibility for it.</li>
+      <li>Submitting the claim or delivering the bill. {{ site.product.name }} does not send anything on your behalf.</li>
+      <li>Legal advice and professional judgment. {{ site.product.name }} drafts; it does not advise.</li>
+    </ul>
+    <p class="actions"><a class="button" href="{{ routes.signup }}">{{ pages.signup.label }}</a></p>
+  </div>
+</section>
+{% endblock %}

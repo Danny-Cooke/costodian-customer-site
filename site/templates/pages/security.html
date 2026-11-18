@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "partials/tables.html" as tables %}
+{% set name = site.product.name %}
+{% set uk = site.hosting.country %}
+{% set years = site.retention.years %}
+
+{% set protections = [
+  {"title": "Encrypted in transit and at rest",
+   "text": "Every file, draft and record is encrypted while it is stored and while it moves, with encryption keys dedicated to your firm."},
+  {"title": "All data held in " ~ uk,
+   "text": "All data is held in " ~ uk ~ ". All compute and all AI models are hosted within " ~ uk ~ " too. Nothing leaves it."},
+  {"title": "AI that does not learn from or keep your data",
+   "text": "The AI models do not learn from your data and do not store it. Your clients' files are never used to train AI."},
+  {"title": "Your firm's data kept apart",
+   "text": "Each firm's files are held in an environment of their own, never pooled with another firm's data."},
+  {"title": "Least-privilege access, set case by case",
+   "text": "Roles are given for each case, not across the firm. A person reaches only the cases they have been given, and on each one only what their role on that case needs. Your firm's administrators manage this centrally, and every change is recorded."},
+  {"title": "Every case's costs file stored in one place",
+   "text": "The case files, every draft, the approved bill and the record of who did what are stored together and securely for each case, ready to retrieve whenever they are asked for."},
+  {"title": "Two-step sign-in for everyone",
+   "text": "Every user signs in with a password and a code from an authenticator app. There are no shared logins."},
+  {"title": "Every access recorded",
+   "text": "Every sign-in, every change to an account or a role, and every time a case is opened, viewed or downloaded is recorded with who did it and when."},
+  {"title": "Nothing amended, everything versioned",
+   "text": "Case files stay exactly as uploaded. Every redraft of a bill is kept as a new version beside the earlier ones, so the full history can be audited."},
+  {"title": "Kept for " ~ years ~ " years, then deleted",
+   "text": "Case files and the record of each bill are kept for " ~ years ~ " years after a case is completed, and then deleted. Nothing is kept indefinitely."},
+] %}
+
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">Your clients' files are the most sensitive thing your firm holds. This is how {{ name }} protects them.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>How your clients' files are protected</h2>
+    {{ tables.feature_table("How your clients' files are protected", "Protection", "What it means for your firm", protections, site.labels.covered) }}
+    <p class="actions">
+      <a class="button" href="{{ routes.sra }}">How this answers the SRA's rules</a>
+      <a class="button quiet" href="{{ routes.features }}">See every feature</a>
+    </p>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap narrow">
+    <h2>Why you can trust it</h2>
+    <ul class="ticks">
+      <li><strong>You can check every figure.</strong> The evidence and the rule are shown for each line, so the bill does not depend on taking the product's word.</li>
+      <li><strong>You keep the final say.</strong> Nothing leaves without your firm's approval.</li>
+      <li><strong>You own your data.</strong> You can export it at any time, and when you leave it is returned or deleted at your choice.</li>
+      <li><strong>We say what we do not have.</strong> {{ name }} is new and does not yet hold certifications such as ISO 27001 or Cyber Essentials. We will say so here when that changes.</li>
+    </ul>
+    <p class="actions"><a class="button large" href="{{ routes.signup }}">{{ pages.signup.label }}</a></p>
+  </div>
+</section>
+{% endblock %}

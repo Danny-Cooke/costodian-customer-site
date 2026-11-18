@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "partials/fields.html" as ui %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">Your contact details and your firm's. Check them and change anything that is not right.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <div class="panel success" data-saved role="status" tabindex="-1" hidden>
+      <h2>Your details are saved</h2>
+      <p><a href="{{ routes.portal }}">Back to {{ pages.portal.label|lower }}</a></p>
+    </div>
+
+    <form novalidate data-form>
+      {{ ui.error_summary(forms.messages) }}
+      {% for step in forms.signup.steps if step.profile %}
+      <section class="form-section" aria-labelledby="section-{{ step.id }}">
+        <h2 id="section-{{ step.id }}">{{ step.title }}</h2>
+        {% for f in step.fields %}
+        {{ ui.field(f, site.rule_kinds) }}
+        {% endfor %}
+      </section>
+      {% endfor %}
+      <p class="actions"><button type="submit" class="button large">Save your details</button></p>
+    </form>
+  </div>
+</section>
+{% endblock %}

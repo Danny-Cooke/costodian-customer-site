@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "partials/tables.html" as tables %}
+{% set name = site.product.name %}
+{% set uk = site.hosting.country %}
+{% set years = site.retention.years %}
+
+{% set duties = [
+  {"title": "You stay responsible for the work",
+   "ref": "Code for Firms 2.3; Code for Solicitors 3.5; SRA warning notice on AI",
+   "text": name ~ " drafts and never decides. No bill is released until a named person at your firm has reviewed and approved it, and nothing is ever submitted or sent on your behalf."},
+  {"title": "Work is properly supervised",
+   "ref": "Code for Solicitors 3.5 and 3.6; Code for Firms 4.3 and 4.4",
+   "text": "A supervisor can see every draft, every correction and every approval, with who made it and when. Nothing on an active case is ever amended or overwritten: the case files stay exactly as uploaded, and each redraft of a bill is kept as a new version beside the earlier ones, so the full history is there to audit. Roles are given case by case, so a supervisor decides who works on which case, and every access to a case is recorded. Rates and billing positions are managed centrally, so the firm's policy is applied the same way by everyone."},
+  {"title": "Client information is kept confidential, for current and former clients",
+   "ref": "Code for Solicitors 6.3; Code for Firms 6.3",
+   "text": "Encryption in transit and at rest, each firm's data held apart, least-privilege access given case by case so that a person sees only the cases they work on, and two-step sign-in for every user."},
+  {"title": "Client information is only put into AI with proper safeguards",
+   "ref": "SRA warning notice on AI",
+   "text": "All data is held in " ~ uk ~ ", and all compute and all AI models are hosted within " ~ uk ~ ". The models do not learn from your data and do not store it, and your clients' files are never used to train AI. Files are not kept longer than the retention period."},
+  {"title": "What you tell a funder, a court or a client is accurate",
+   "ref": "Code for Solicitors 1.4; Code for Firms 1.4; SRA warning notice on AI",
+   "text": "Every figure is tied to the document it came from and to the published rule or agreed rate that priced it. Where the files do not support an item, it is raised with you and not assumed."},
+  {"title": "You can show what was done and produce your records",
+   "ref": "Code for Firms 2.2 and 3.3; Code for Solicitors 7.3 and 7.4",
+   "text": "A complete record is kept with every bill: what was uploaded, what was drafted, who confirmed and who approved. Access to each account and each case is audited too: who signed in, who opened which case, and when. Your firm can retrieve it, and export its data, whenever it is asked."},
+  {"title": "Records are kept securely for the required period",
+   "ref": "SRA Accounts Rules 13.1; Legal Aid Agency Standard Terms 8.6 and 8.7",
+   "text": "Files and bill records are kept for " ~ years ~ " years after a case is completed, which covers the " ~ site.retention.minimum_years ~ "-year periods in those rules, and are then deleted."},
+  {"title": "You know who your suppliers are and can check them",
+   "ref": "Code for Firms 2.1 and 2.5",
+   "text": "A written " ~ site.agreement.title|lower ~ ", a list of everyone who handles your data given to your firm on request, and this page. We tell you before any of it changes."},
+  {"title": "You hear promptly when something goes wrong",
+   "ref": "Code for Firms 3.9; Code for Solicitors 7.7 and 7.8",
+   "text": "If your firm's data is ever affected by a security incident, we tell you without delay, with what happened and what we are doing, so you can meet your own duties in time."},
+  {"title": "Client money is safeguarded",
+   "ref": "Code for Solicitors 4.2; SRA Accounts Rules",
+   "text": name ~ " never holds, receives or moves client money. It drafts bills and nothing else."},
+] %}
+
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">Your firm answers to the SRA for its clients' files wherever they are held, and for every bill it puts its name to. This page takes what the rules ask of you, point by point, and shows how {{ name }} answers each one.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>What the rules ask of your firm, and how {{ name }} answers</h2>
+    <p>References are to the SRA Code of Conduct for Solicitors, the SRA Code of Conduct for Firms, the SRA Accounts Rules and the SRA's warning notice on the use of artificial intelligence.</p>
+    {{ tables.feature_table("What the rules ask of your firm, and how " ~ name ~ " answers", "What is asked of you", "How " ~ name ~ " answers it", duties, site.labels.covered) }}
+    <p class="help">This describes how the product supports your compliance. It is not legal advice, and using {{ name }} does not move any professional responsibility away from your firm. Your compliance officer decides whether it meets your firm's obligations.</p>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap narrow">
+    <h2>What stays with your firm</h2>
+    <ul class="plain">
+      <li>The decision to approve a bill, and responsibility for it.</li>
+      <li>Submitting the claim or delivering the bill. {{ name }} does not send anything on your behalf.</li>
+      <li>Legal advice and professional judgment. {{ name }} drafts; it does not advise.</li>
+    </ul>
+    <p class="actions">
+      <a class="button" href="{{ routes.security }}">How your clients' files are protected</a>
+      <a class="button large" href="{{ routes.signup }}">{{ pages.signup.label }}</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,20 @@
+[
+  {"name": "a required text field left empty", "field": {"id": "a", "label": "full name", "type": "text", "required": true}, "values": {"a": ""}, "message": "Enter full name"},
+  {"name": "an optional field left empty", "field": {"id": "a", "label": "full name", "type": "text"}, "values": {}, "message": null},
+  {"name": "a required tick box left unticked", "field": {"id": "a", "label": "x", "type": "checkbox", "required": true}, "values": {"a": false}, "message": "Tick the box to continue"},
+  {"name": "a required choice not made", "field": {"id": "a", "label": "role", "type": "select", "required": true, "options": [{"value": "p", "label": "P"}]}, "values": {"a": ""}, "message": "Choose role"},
+  {"name": "text over its length", "field": {"id": "a", "label": "name", "type": "text", "max_length": 3}, "values": {"a": "abcd"}, "message": "name is too long"},
+  {"name": "text under its length", "field": {"id": "a", "label": "password", "type": "password", "min_length": 12}, "values": {"a": "short"}, "message": "Use at least 12 characters"},
+  {"name": "a pattern that fails, with its own message", "field": {"id": "a", "label": "email", "type": "email", "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", "pattern_message": "Bad email"}, "values": {"a": "sam-at-example"}, "message": "Bad email"},
+  {"name": "a pattern that passes", "field": {"id": "a", "label": "email", "type": "email", "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", "pattern_message": "Bad email"}, "values": {"a": "sam@example.test"}, "message": null},
+  {"name": "two entries that differ", "field": {"id": "b", "label": "again", "type": "password", "matches": "a"}, "values": {"a": "one", "b": "two"}, "message": "The two entries do not match"},
+  {"name": "two entries that agree", "field": {"id": "b", "label": "again", "type": "password", "matches": "a"}, "values": {"a": "one", "b": "one"}, "message": null},
+  {"name": "a number that is not one", "field": {"id": "a", "label": "minutes", "type": "number"}, "values": {"a": "six"}, "message": "minutes must be a number"},
+  {"name": "a number below its minimum", "field": {"id": "a", "label": "minutes", "type": "number", "min": 1, "max": 60}, "values": {"a": "0"}, "message": "minutes must be 1 or more"},
+  {"name": "a number above its maximum", "field": {"id": "a", "label": "minutes", "type": "number", "min": 1, "max": 60}, "values": {"a": "61"}, "message": "minutes must be 60 or less"},
+  {"name": "a number in range", "field": {"id": "a", "label": "minutes", "type": "number", "min": 1, "max": 60}, "values": {"a": "30"}, "message": null},
+  {"name": "a hidden required field is not asked for", "field": {"id": "a", "label": "company number", "type": "text", "required": true, "show_if": {"field": "kind", "in": ["llp", "limited"]}}, "values": {"kind": "sole"}, "message": null},
+  {"name": "a shown required field is asked for", "field": {"id": "a", "label": "company number", "type": "text", "required": true, "show_if": {"field": "kind", "in": ["llp", "limited"]}}, "values": {"kind": "llp"}, "message": "Enter company number"},
+  {"name": "a field shown by an equals condition", "field": {"id": "a", "label": "rate", "type": "text", "required": true, "show_if": {"field": "own", "equals": false}}, "values": {"own": false}, "message": "Enter rate"},
+  {"name": "a note is never checked", "field": {"id": "a", "label": "note", "type": "note", "required": true}, "values": {}, "message": null}
+]

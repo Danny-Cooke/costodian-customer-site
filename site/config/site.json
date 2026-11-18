@@ -1,0 +1,250 @@
+{
+  "product": {
+    "name": null,
+    "strapline": "Bills of costs drafted from your case files",
+    "audience": "For legally aided and privately funded work",
+    "speed": "Drafted in minutes, not days",
+    "trade": "draftsman"
+  },
+  "company": {
+    "name": "CM-IT",
+    "contact_email": ""
+  },
+  "preview": {
+    "enabled": true,
+    "message": "Preview. Sign-up is not open yet. Nothing you enter here is saved or sent.",
+    "message_live": "Preview. Sign-up is free while we test, and no payment is taken."
+  },
+  "pricing": {
+    "currency_symbol": "£",
+    "per_bill": null,
+    "refund_days": null,
+    "payment_enabled": false
+  },
+  "hosting": {
+    "country": "the UK"
+  },
+  "storage_key": "{{ site.product.name | lower }}-site-preview",
+  "routes": {
+    "home": "/",
+    "features": "/features/",
+    "how": "/how-it-works/",
+    "security": "/security/",
+    "sra": "/sra-compliance/",
+    "pricing": "/pricing/",
+    "signup": "/signup/",
+    "signin": "/signin/",
+    "portal": "/portal/",
+    "details": "/portal/details/",
+    "company": "/portal/company/",
+    "agreements": "/portal/agreements/",
+    "not_found": "/404.html"
+  },
+  "nav": {
+    "public": [
+      "features",
+      "how",
+      "security",
+      "sra",
+      "pricing"
+    ],
+    "portal": [
+      "portal",
+      "details",
+      "company",
+      "agreements"
+    ]
+  },
+  "pages": [
+    {
+      "route": "home",
+      "template": "pages/index.html",
+      "area": "public",
+      "label": "Home",
+      "title": "Bills of costs for legal aid and private work",
+      "description": "{{ site.product.name }} drafts bills of costs from your case files, for legally aided and privately funded work, with the evidence shown for every line."
+    },
+    {
+      "route": "features",
+      "template": "pages/features.html",
+      "area": "public",
+      "label": "Features",
+      "title": "Features",
+      "description": "Everything {{ site.product.name }} does for your firm: secure case storage, bills of costs drafted in minutes, access set case by case, and a full audit history."
+    },
+    {
+      "route": "how",
+      "template": "pages/how-it-works.html",
+      "area": "public",
+      "label": "How it works",
+      "title": "How it works",
+      "description": "From uploaded case files to an approved bill of costs, for legal aid and privately funded work."
+    },
+    {
+      "route": "security",
+      "template": "pages/security.html",
+      "area": "public",
+      "label": "Security",
+      "title": "Security",
+      "description": "How {{ site.product.name }} protects your clients' files: encryption, data held in {{ site.hosting.country }}, and access set case by case."
+    },
+    {
+      "route": "sra",
+      "template": "pages/sra-compliance.html",
+      "area": "public",
+      "label": "SRA compliance",
+      "title": "SRA compliance",
+      "description": "What the SRA's rules ask of your firm, point by point, and how {{ site.product.name }} answers each one."
+    },
+    {
+      "route": "pricing",
+      "template": "pages/pricing.html",
+      "area": "public",
+      "label": "Pricing",
+      "title": "Pricing",
+      "description": "What a drafted bill costs and what is included, for legal aid and privately funded work."
+    },
+    {
+      "route": "signup",
+      "template": "pages/signup.html",
+      "area": "public",
+      "label": "Sign up",
+      "title": "Sign up",
+      "description": "Create an account for your firm.",
+      "scripts": [
+        "signup"
+      ]
+    },
+    {
+      "route": "signin",
+      "template": "pages/signin.html",
+      "area": "public",
+      "label": "Sign in",
+      "title": "Sign in",
+      "description": "Sign in to your {{ site.product.name }} account.",
+      "scripts": [
+        "signin"
+      ]
+    },
+    {
+      "route": "portal",
+      "template": "pages/portal/index.html",
+      "area": "portal",
+      "label": "My account",
+      "title": "My account",
+      "description": "Your details, your firm's billing set-up and the agreement.",
+      "scripts": [
+        "portal"
+      ]
+    },
+    {
+      "route": "details",
+      "template": "pages/portal/details.html",
+      "area": "portal",
+      "label": "Your details",
+      "title": "Your details",
+      "description": "Your contact details and your firm's.",
+      "scripts": [
+        "details"
+      ]
+    },
+    {
+      "route": "company",
+      "template": "pages/portal/company.html",
+      "area": "portal",
+      "label": "Company information",
+      "title": "Company information",
+      "description": "Billing set-up, fee earners and the firm's positions.",
+      "scripts": [
+        "company"
+      ]
+    },
+    {
+      "route": "agreements",
+      "template": "pages/portal/agreements.html",
+      "area": "portal",
+      "label": "Agreements",
+      "title": "Agreements",
+      "description": "The data processing agreement between your firm and us.",
+      "scripts": [
+        "agreements"
+      ]
+    },
+    {
+      "route": "not_found",
+      "template": "pages/404.html",
+      "area": "public",
+      "label": "Page not found",
+      "title": "Page not found",
+      "description": "That page does not exist."
+    }
+  ],
+  "setup_steps": [
+    {
+      "id": "details",
+      "route": "details",
+      "title": "Your details",
+      "summary": "Your contact details and your firm's details."
+    },
+    {
+      "id": "company",
+      "route": "company",
+      "title": "Company information",
+      "summary": "Billing set-up, fee earners and how your firm bills."
+    },
+    {
+      "id": "agreement",
+      "route": "agreements",
+      "title": "Data processing agreement",
+      "summary": "Read and accept the agreement that covers your clients' data."
+    }
+  ],
+  "agreement": {
+    "id": "dpa",
+    "title": "Data Processing Agreement",
+    "version": "draft-0.1",
+    "draft": true
+  },
+  "rule_kinds": {
+    "judgment": "The rules give your firm this choice",
+    "unclear": "The published guidance is not clear"
+  },
+  "labels": {
+    "yes": "Yes",
+    "no": "No",
+    "done": "Done",
+    "to_do": "To do",
+    "blank": "Not given",
+    "covered": "Covered"
+  },
+  "identity": {
+    "person_name_field": "person_name",
+    "firm_name_field": "firm_name",
+    "person_email_field": "person_email",
+    "password_field": "person_password"
+  },
+  "retention": {
+    "years": 7,
+    "minimum_years": 6
+  },
+  "auth": {
+    "client_id": "",
+    "endpoint": "",
+    "password_min_length": 12,
+    "session_suffix": "-session",
+    "refresh_margin_seconds": 60
+  },
+  "api": {
+    "base_path": "/api",
+    "account_path": "/account",
+    "agreement_path": "/account/agreement"
+  },
+  "limits": {
+    "max_fee_earners": 100,
+    "max_text_length": 2000,
+    "max_body_bytes": 65536
+  },
+  "portal": {
+    "details_route": "details"
+  }
+}

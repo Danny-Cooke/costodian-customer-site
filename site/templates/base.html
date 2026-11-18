@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title }} | {{ site.product.name }}</title>
+  <meta name="description" content="{{ page.description }}">
+  {% if site.preview.enabled or page.area == 'portal' %}<meta name="robots" content="noindex">{% endif %}
+
+  <link rel="stylesheet" href="{{ static }}/css/site.css">
+</head>
+<body class="area-{{ page.area }}">
+  <a class="skip" href="#main">Skip to the main content</a>
+  {% if site.preview.enabled %}
+  <p class="preview-banner">{{ site.preview.message_live if site.auth.client_id else site.preview.message }}</p>
+  {% endif %}
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="{{ routes.portal if page.area == 'portal' else routes.home }}">{{ site.product.name }}</a>
+      <nav aria-label="Main">
+        <ul class="nav">
+          {% for name in site.nav[page.area] %}
+          <li><a href="{{ routes[name] }}"{% if name == page.route %} aria-current="page"{% endif %}>{{ pages[name].label }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+      {% if page.area == 'portal' %}
+      <div class="account">
+        <span class="account-name"><span data-user-name></span><span class="account-firm" data-firm-name></span></span>
+        <button type="button" class="button quiet" data-sign-out>Sign out</button>
+      </div>
+      {% else %}
+      <div class="account">
+        {% if site.auth.client_id %}<a class="button quiet" href="{{ routes.signin }}">{{ pages.signin.label }}</a>{% endif %}
+        <a class="button" href="{{ routes.signup }}">{{ pages.signup.label }}</a>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <main id="main">
+    {% block main %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <p>{{ site.product.name }} is made by {{ site.company.name }}.{% if site.company.contact_email %} Contact: <a href="mailto:{{ site.company.contact_email }}">{{ site.company.contact_email }}</a>.{% endif %}</p>
+      <ul class="nav">
+        {% for name in site.nav.public %}
+        <li><a href="{{ routes[name] }}">{{ pages[name].label }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </footer>
+
+  <script type="application/json" id="{{ page_data_id }}">{{ page_data|tojson }}</script>
+  {% if page.area == 'portal' %}
+  <script type="module" src="{{ static }}/js/session.js"></script>
+  {% endif %}
+  {% for name in page.scripts|default([]) %}
+  <script type="module" src="{{ static }}/js/{{ name }}.js"></script>
+  {% endfor %}
+</body>
+</html>

@@ -1,0 +1,29 @@
+[project]
+name = "draftsman-customer-site"
+version = "0.1.0"
+description = "The public site and customer sign-up portal"
+requires-python = ">=3.12"
+dependencies = ["jinja2>=3.1", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.setuptools]
+py-modules = []
+packages = []
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
+
+# Our own modules, named so that import order does not depend on which build
+# output folders happen to exist on the machine running the check.
+[tool.ruff.lint.isort]
+known-first-party = ["build", "build_api", "smoke", "sync_rules", "handler", "validation"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
