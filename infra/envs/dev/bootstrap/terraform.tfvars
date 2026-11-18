@@ -384,8 +384,12 @@ service_roles = {
         ]
       }
       function_listing = {
-        resources     = ["unscopable"]
-        read_actions  = ["lambda:ListFunctions"]
+        resources = ["unscopable"]
+        # Listing log groups is granted on the account, never on one group.
+        read_actions = [
+          "lambda:ListFunctions",
+          "logs:DescribeLogGroups",
+        ]
         write_actions = []
       }
       # It may hand a function role to Lambda and to nothing else, and only a
