@@ -181,11 +181,13 @@ def guarded(handler: Any) -> Any:
 
 @guarded
 def read(event: Event) -> dict[str, Any]:
-    from boto3.dynamodb.conditions import Key
-
     subject = claims(event)["sub"]
     hash_key = os.environ["TABLE_HASH_KEY"]
-    found = table().query(KeyConditionExpression=Key(hash_key).eq(keys(subject, "")[hash_key]))
+    found = table().query(
+        KeyConditionExpression="#hash = :account",
+        ExpressionAttributeNames={"#hash": hash_key},
+        ExpressionAttributeValues={":account": keys(subject, "")[hash_key]},
+    )
     by_section = {item[os.environ["TABLE_RANGE_KEY"]]: item["data"] for item in found.get("Items", [])}
     return {
         "signup": by_section.get("signup"),
