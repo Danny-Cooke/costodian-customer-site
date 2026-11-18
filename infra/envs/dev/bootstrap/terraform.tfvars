@@ -350,6 +350,15 @@ service_roles = {
           "logs:UntagResource",
         ]
       }
+      # CloudWatch Logs checks that whoever creates an encrypted log group can
+      # see the key it names.
+      account_key_for_log_groups = {
+        resources    = ["account_key"]
+        read_actions = []
+        write_actions = [
+          "kms:DescribeKey",
+        ]
+      }
       # API Gateway authorises by request path and method, not by API name, and
       # tags are written as a call on /tags. An HTTP API's id is generated, so
       # /apis/* is as narrow as the service allows. GET is the whole read set.
