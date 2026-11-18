@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% import "partials/fields.html" as ui %}
+{% macro panel(name, title, intro, fields, button) %}
+<section class="form-step" data-panel="{{ name }}" aria-labelledby="panel-{{ name }}"{% if name != 'signin' %} hidden{% endif %}>
+  <h2 id="panel-{{ name }}" tabindex="-1">{{ title }}</h2>
+  <p>{{ intro }}</p>
+  <form novalidate>
+    {{ ui.error_summary(forms.messages) }}
+    {% for f in fields %}
+    {{ ui.field(f, site.rule_kinds) }}
+    {% endfor %}
+    <p class="actions">
+      <button type="submit" class="button large">{{ button }}</button>
+      {{ caller() }}
+    </p>
+  </form>
+</section>
+{% endmacro %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <p class="notice" data-notice role="status" hidden></p>
+
+    {% call panel("signin", "Sign in to your account", "Use the email address and password you signed up with.", forms.signin.fields, "Sign in") %}
+    <button type="button" class="button quiet" data-show="reset-request">Forgotten your password?</button>
+    {% endcall %}
+
+    {% call panel("verify", "Check your email", "Your email address has not been confirmed yet. We have sent you a new 6 digit code.", forms.verify.fields, "Confirm and sign in") %}
+    <button type="button" class="button quiet" data-show="signin">Back</button>
+    {% endcall %}
+
+    {% call panel("reset-request", "Reset your password", "Enter your email address and we will send you a code.", forms.reset.request.fields, "Send the code") %}
+    <button type="button" class="button quiet" data-show="signin">Back</button>
+    {% endcall %}
+
+    {% call panel("reset-confirm", "Choose a new password", "Enter the code from the email and your new password.", forms.reset.confirm.fields, "Change password") %}
+    <button type="button" class="button quiet" data-show="signin">Back</button>
+    {% endcall %}
+
+    <p class="help">Not signed up yet? <a href="{{ routes.signup }}">{{ pages.signup.label }}</a>.</p>
+  </div>
+</section>
+{% endblock %}

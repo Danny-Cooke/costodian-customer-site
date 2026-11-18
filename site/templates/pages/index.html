@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">{{ site.product.speed }}</p>
+    <h1>{{ site.product.strapline }}</h1>
+    <p class="lead"><strong>{{ site.product.audience }}.</strong> Upload the case files and receive a drafted bill of costs in minutes, with the evidence behind every line. Your firm checks it, approves it and stays in control throughout.</p>
+    <p class="actions">
+      <a class="button large" href="{{ routes.signup }}">{{ pages.signup.label }}</a>
+      <a class="button large quiet" href="{{ routes.how }}">{{ pages.how.label }}</a>
+    </p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>One {{ site.product.trade }} for both kinds of work</h2>
+    <ul class="cards two">
+      <li class="card">
+        <h3>Legally aided work</h3>
+        <p>Bills priced under the Legal Aid Agency's published rates, fees and rules, with each line tied to the rule that prices it. Where the rules leave your firm a choice, your firm's recorded position is applied the same way on every case.</p>
+      </li>
+      <li class="card">
+        <h3>Privately funded work</h3>
+        <p>Bills priced at your firm's own rates and terms: your hourly rates by grade, the way your firm charges for letters, emails and calls, and whatever was agreed with that client.</p>
+      </li>
+    </ul>
+    <p>A case that starts privately funded and moves to legal aid is handled as one case, with each period billed under its own terms.</p>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap">
+    <h2>What {{ site.product.name }} gives your firm</h2>
+    <ul class="cards">
+      <li class="card">
+        <h3>{{ site.product.speed }}</h3>
+        <p>A bill that takes a {{ site.product.trade }} days to prepare is drafted while you get on with something else. No queue, no waiting for a file to come back, and no backlog building up.</p>
+      </li>
+      <li class="card">
+        <h3>Evidence for every figure</h3>
+        <p>Every line on the bill points to the document it came from and the rule or rate that priced it. Nothing has to be taken on trust.</p>
+      </li>
+      <li class="card">
+        <h3>Nothing guessed</h3>
+        <p>Where the files do not settle a point, it is put to you as a question. A gap is never filled with an assumption.</p>
+      </li>
+      <li class="card">
+        <h3>Chargeable work found</h3>
+        <p>Work that was done but never recorded, such as emails and calls that were not time-recorded, is found in the files and put forward.</p>
+      </li>
+      <li class="card">
+        <h3>Every case's costs file in one place</h3>
+        <p>The case files, every draft, the approved bill and the record of who did what are stored together, securely, for {{ site.retention.years }} years after the case is completed. Nothing to file, and nothing to go looking for.</p>
+      </li>
+      <li class="card">
+        <h3>See where every bill stands</h3>
+        <p>One list of your firm's cases shows which are uploaded, drafted, under review and approved, so nothing sits forgotten and a backlog cannot build up unseen.</p>
+      </li>
+      <li class="card">
+        <h3>Access set case by case</h3>
+        <p>Roles are given for each case, not across the firm. A person sees and works on only the cases they have been given, in the role they hold on that case.</p>
+      </li>
+      <li class="card">
+        <h3>Your firm's policy, managed centrally</h3>
+        <p>Rates, fee earners and billing positions are set once for the firm and applied to every case, so two people cannot bill the same work two ways.</p>
+      </li>
+      <li class="card">
+        <h3>A named person approves</h3>
+        <p>No bill is released until someone at your firm has reviewed and approved it. Your professional judgment stays where it belongs.</p>
+      </li>
+      <li class="card">
+        <h3>A complete record</h3>
+        <p>Who uploaded, who confirmed, who approved and when. Nothing is amended or overwritten: every redraft is kept as a new version, so the whole history can be audited.</p>
+      </li>
+    </ul>
+    <p class="actions"><a class="button" href="{{ routes.features }}">See every feature</a></p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <h2>Built for regulated firms</h2>
+    <ul class="ticks">
+      <li>All data encrypted in transit and at rest</li>
+      <li>Each firm's files held separately from every other firm's</li>
+      <li>Role-based access on least privilege, granted case by case and managed centrally by your firm</li>
+      <li>Every access to an account and to a case audited</li>
+      <li>Nothing deleted or overwritten: every change kept as a new version</li>
+      <li>Every case's files, drafts and approved bills stored securely in one place</li>
+      <li>Case files kept for {{ site.retention.years }} years after a case is completed, then deleted</li>
+      <li>All data is held in {{ site.hosting.country }}</li>
+      <li>All compute and all AI models are hosted within {{ site.hosting.country }}</li>
+      <li>The AI models do not learn from your data and do not store it</li>
+      <li>Your clients' files are never used to train AI</li>
+    </ul>
+    <p class="actions"><a class="button" href="{{ routes.sra }}">How this answers the SRA's rules</a></p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "partials/tables.html" as tables %}
+{% set name = site.product.name %}
+{% set uk = site.hosting.country %}
+{% set years = site.retention.years %}
+{% set covered = site.labels.covered %}
+
+{% set storage = [
+  {"title": "A secure store for every case",
+   "text": "Each case has its own store holding the case files, every draft, the approved bill and the record of who did what. Everything about a case's costs is in one place, with nothing to file and nothing to go looking for."},
+  {"title": "Every kind of file, as it is",
+   "text": "Emails, letters, attendance notes, court orders, invoices, and scanned or handwritten pages are all accepted as they are. Nobody has to sort, rename or re-type anything before uploading."},
+  {"title": "Originals never changed",
+   "text": "The files you upload stay exactly as you uploaded them, so the store can be relied on as a true copy of what your firm held."},
+  {"title": "Kept for " ~ years ~ " years",
+   "text": "Case files and bill records are kept for " ~ years ~ " years after a case is completed, so they are there when a funder, a court, a client or your regulator asks."},
+  {"title": "One view of every case",
+   "text": "One list shows where each bill stands, from uploaded to drafted, under review and approved. Nothing sits forgotten, and a backlog cannot build up unseen."},
+  {"title": "Yours to take away",
+   "text": "Your firm can retrieve and export its files and records whenever it needs to. Your data stays yours."},
+] %}
+
+{% set drafting = [
+  {"title": site.product.speed,
+   "text": "A bill that takes a " ~ site.product.trade ~ " days to prepare is drafted within minutes of the upload. No queue, and no waiting for a file to come back."},
+  {"title": "Legally aided bills",
+   "text": "Priced under the Legal Aid Agency's published rates, fees and rules, with each line tied to the rule that prices it, so the bill stands up on assessment."},
+  {"title": "Privately funded bills",
+   "text": "Priced at your firm's own rates and terms, including how your firm charges for letters, emails and calls, and whatever was agreed with that client."},
+  {"title": "Evidence for every figure",
+   "text": "Every line points to the document it came from and the rule or rate that priced it. A reviewer checks a line in seconds, and nothing has to be taken on trust."},
+  {"title": "Chargeable work found",
+   "text": "Work that was done but never time-recorded, such as emails and calls, is found in the files and put forward, so your firm is paid for work it actually did."},
+  {"title": "Nothing guessed",
+   "text": "Where the files do not settle a point, it is put to you as a question. A gap is never filled with an assumption that could later be challenged."},
+  {"title": "Your firm's policy on every bill",
+   "text": "Rates, fee earners and billing positions are set once for the firm and applied to every case, so two people cannot bill the same work two ways."},
+  {"title": "A bill ready to use",
+   "text": "The approved bill is released as a Word document, with a report of the working behind it and the record of who confirmed and approved it."},
+] %}
+
+{% set ai = [
+  {"title": "Reads the whole file",
+   "text": "Every page is read in full, including scanned and handwritten ones, so chargeable work is not missed because it was buried in a long file."},
+  {"title": "Every figure calculated, not generated",
+   "text": "AI is used to read. The figures on the bill are calculated from the published rates and your firm's own, so the arithmetic is right and can be reproduced."},
+  {"title": "Checked before you see it",
+   "text": "What is read from the files is checked a second time before it reaches you, and anything in doubt is flagged for your attention."},
+  {"title": "Hosted in " ~ uk,
+   "text": "All compute and all AI models are hosted within " ~ uk ~ ". Your clients' files do not leave it."},
+  {"title": "Does not learn from or keep your data",
+   "text": "The AI models do not learn from your data and do not store it, and your clients' files are never used to train AI."},
+  {"title": "A person always decides",
+   "text": "AI drafts and never decides. No bill is released until a named person at your firm has reviewed and approved it."},
+] %}
+
+{% set access = [
+  {"title": "Roles set case by case",
+   "text": "Roles are given for each case, not across the firm. A person sees and works on only the cases they have been given, in the role they hold on that case, which keeps each client's file with the people who need it."},
+  {"title": "Least privilege",
+   "text": "Each role reaches only what it needs. Being able to view a case does not mean being able to change it, and being able to draft does not mean being able to approve."},
+  {"title": "Managed centrally by your firm",
+   "text": "Your firm's administrators add and remove people, give and take away roles, and set who supervises which case, all in one place."},
+  {"title": "Two-step sign-in for everyone",
+   "text": "Every user signs in with a password and a code from an authenticator app, and there are no shared logins, so every action belongs to a named person."},
+  {"title": "Named approval",
+   "text": "Only a person your firm has given the approver's role on a case can release its bill."},
+] %}
+
+{% set audit = [
+  {"title": "Account access audited",
+   "text": "Every sign-in, every user added or removed and every change of role is recorded with who did it and when, so your firm can always show who had access to what."},
+  {"title": "Case access audited",
+   "text": "Every time a case is opened, a file viewed or a bill downloaded, it is recorded against the person who did it. If a question is ever asked about a client's file, the answer is there."},
+  {"title": "Nothing deleted or overwritten",
+   "text": "While your firm holds a case, no data is deleted and nothing is written over. Every change is added as a new version beside what was there before."},
+  {"title": "Every draft kept",
+   "text": "Drafting is iterative: each redraft of a bill is a new version, and the earlier ones stay. You can see what changed between any two, who changed it and why."},
+  {"title": "A complete history for supervisors",
+   "text": "A supervisor sees every draft, correction and approval on a case, in order, which makes supervision something your firm can evidence."},
+] %}
+
+{% set protection = [
+  {"title": "Encrypted in transit and at rest",
+   "text": "Every file, draft and record is encrypted while it is stored and while it moves, with encryption keys dedicated to your firm."},
+  {"title": "Your firm's data kept apart",
+   "text": "Each firm's files are held in an environment of their own, never pooled with another firm's data."},
+  {"title": "All data held in " ~ uk,
+   "text": "All data is held in " ~ uk ~ ", which keeps it within the reach of the law your firm works under."},
+] %}
+
+{% set groups = [
+  {"id": "storage", "title": "Secure case storage", "lead": "A safe home for every case's costs file.", "rows": storage},
+  {"id": "drafting", "title": "Bills of costs, drafted for you", "lead": "For legally aided and privately funded work.", "rows": drafting},
+  {"id": "ai", "title": "AI you can rely on", "lead": "Used where it helps, and kept away from where it should not decide.", "rows": ai},
+  {"id": "access", "title": "Access and control", "lead": "The right people on each case, and nobody else.", "rows": access},
+  {"id": "audit", "title": "Audit and version history", "lead": "Everything recorded, nothing lost.", "rows": audit},
+  {"id": "protection", "title": "Protection of your data", "lead": "The foundations under everything above.", "rows": protection},
+] %}
+
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">{{ name }} keeps every case's costs file safe and drafts the bill from it. This is everything it does, and what each part means for your firm.</p>
+  </div>
+</section>
+
+{% for group in groups %}
+<section class="band{% if loop.index is even %} alt{% endif %}" id="{{ group.id }}">
+  <div class="wrap">
+    <h2>{{ group.title }}</h2>
+    <p>{{ group.lead }}</p>
+    {{ tables.feature_table(group.title, "Feature", "What it does for your firm", group.rows, covered) }}
+  </div>
+</section>
+{% endfor %}
+
+<section class="band{% if groups|length is even %} alt{% endif %}">
+  <div class="wrap narrow">
+    <p class="actions">
+      <a class="button large" href="{{ routes.signup }}">{{ pages.signup.label }}</a>
+      <a class="button large quiet" href="{{ routes.sra }}">{{ pages.sra.label }}</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

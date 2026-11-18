@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">That page does not exist. It may have moved.</p>
+    <p class="actions"><a class="button" href="{{ routes.home }}">Go to the {{ pages.home.label|lower }} page</a></p>
+  </div>
+</section>
+{% endblock %}

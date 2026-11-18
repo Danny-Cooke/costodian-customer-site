@@ -1,0 +1,86 @@
+{# One macro renders every kind of field from its definition in forms.json. #}
+{% macro rule_box(rule, kinds) %}
+<details class="rule">
+  <summary>{{ kinds[rule.kind] }}: see the rule</summary>
+  <p class="rule-title">{{ rule.title }}</p>
+  <blockquote>{{ rule.text }}</blockquote>
+  <p class="rule-source">{{ rule.source }}</p>
+  {% if rule.note %}<p>{{ rule.note }}</p>{% endif %}
+</details>
+{% endmacro %}
+
+{% macro help_and_error(f, fid) %}
+  {% if f.help %}<p class="help" id="{{ fid }}-help">{{ f.help }}</p>{% endif %}
+  <p class="error" id="{{ fid }}-error" data-error hidden></p>
+{% endmacro %}
+
+{% macro described(f, fid) %}aria-describedby="{% if f.help %}{{ fid }}-help {% endif %}{{ fid }}-error"{% endmacro %}
+
+{% macro field(f, kinds, prefix='') %}
+{% set fid = prefix ~ f.id %}
+{% if f.type == 'group' %}
+<fieldset class="group" data-field="{{ f.id }}">
+  <legend>{{ f.label|ucfirst }}</legend>
+  {% for child in f.fields %}
+  {{ field(child, kinds, prefix) }}
+  {% endfor %}
+</fieldset>
+{% elif f.type == 'note' %}
+<div class="field note" data-field="{{ f.id }}">
+  <p class="field-label">{{ f.label|ucfirst }}</p>
+  <p>{{ f.text }}</p>
+  {% if f.rule %}{{ rule_box(f.rule, kinds) }}{% endif %}
+</div>
+{% elif f.type == 'checkbox' %}
+<div class="field check" data-field="{{ f.id }}">
+  <div class="choice">
+    <input type="checkbox" id="{{ fid }}" name="{{ fid }}" data-input="{{ f.id }}" {{ described(f, fid) }}{% if f.default %} checked{% endif %}>
+    <label for="{{ fid }}">{{ f.label|ucfirst }}</label>
+  </div>
+  {{ help_and_error(f, fid) }}
+</div>
+{% elif f.type == 'radio' %}
+<fieldset class="field" data-field="{{ f.id }}">
+  <legend class="field-label">{{ f.label|ucfirst }}</legend>
+  {% if f.help %}<p class="help" id="{{ fid }}-help">{{ f.help }}</p>{% endif %}
+  {% for option in f.options %}
+  <div class="choice">
+    <input type="radio" id="{{ fid }}-{{ loop.index }}" name="{{ fid }}" value="{{ option.value }}" data-input="{{ f.id }}"{% if f.default == option.value %} checked{% endif %}>
+    <label for="{{ fid }}-{{ loop.index }}">{{ option.label }}</label>
+  </div>
+  {% endfor %}
+  <p class="error" id="{{ fid }}-error" data-error hidden></p>
+  {% if f.rule %}{{ rule_box(f.rule, kinds) }}{% endif %}
+</fieldset>
+{% elif f.type == 'select' %}
+<div class="field" data-field="{{ f.id }}">
+  <label class="field-label" for="{{ fid }}">{{ f.label|ucfirst }}</label>
+  <select id="{{ fid }}" name="{{ fid }}" data-input="{{ f.id }}" {{ described(f, fid) }}>
+    <option value=""></option>
+    {% for option in f.options %}
+    <option value="{{ option.value }}">{{ option.label }}</option>
+    {% endfor %}
+  </select>
+  {{ help_and_error(f, fid) }}
+</div>
+{% else %}
+<div class="field" data-field="{{ f.id }}">
+  <label class="field-label" for="{{ fid }}">{{ f.label|ucfirst }}</label>
+  <input type="{{ 'text' if f.type == 'number' else f.type }}" id="{{ fid }}" name="{{ fid }}" data-input="{{ f.id }}" {{ described(f, fid) }}
+    {%- if f.type == 'number' %} inputmode="decimal" class="short"{% endif %}
+    {%- if f.inputmode %} inputmode="{{ f.inputmode }}"{% endif %}
+    {%- if f.autocomplete %} autocomplete="{{ f.autocomplete }}"{% endif %}
+    {%- if f.max_length %} maxlength="{{ f.max_length }}"{% endif %}
+    {%- if f.default is not none %} value="{{ f.default }}"{% endif %}>
+  {{ help_and_error(f, fid) }}
+  {% if f.rule %}{{ rule_box(f.rule, kinds) }}{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro error_summary(messages) %}
+<div class="error-summary" data-summary role="alert" tabindex="-1" hidden>
+  <h2>{{ messages.summary_title }}</h2>
+  <ul></ul>
+</div>
+{% endmacro %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "partials/fields.html" as ui %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <ol class="progress" data-progress>
+      {% for step in forms.signup.steps %}
+      <li data-progress-step="{{ step.id }}">{{ step.title }}</li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <form novalidate data-form>
+      {{ ui.error_summary(forms.messages) }}
+      {% for step in forms.signup.steps %}
+      <section class="form-step" data-step="{{ step.id }}" aria-labelledby="step-{{ step.id }}"{% if not loop.first %} hidden{% endif %}>
+        <h2 id="step-{{ step.id }}" tabindex="-1">{{ step.title }}</h2>
+        <p>{{ step.intro }}</p>
+        {% if loop.last %}
+        <div class="review" data-review></div>
+        {% endif %}
+        {% for f in step.fields %}
+        {{ ui.field(f, site.rule_kinds) }}
+        {% endfor %}
+        <p class="actions">
+          {% if not loop.first %}<button type="button" class="button quiet" data-back>Back</button>{% endif %}
+          {% if loop.last %}
+          <button type="submit" class="button large">Create my account</button>
+          {% else %}
+          <button type="submit" class="button">Continue</button>
+          {% endif %}
+        </p>
+      </section>
+      {% endfor %}
+    </form>
+
+    {% if site.auth.client_id %}
+    <section class="form-step" data-verify aria-labelledby="verify-title" hidden>
+      <h2 id="verify-title" tabindex="-1">Check your email</h2>
+      <p>We have sent a 6 digit code to <strong data-verify-email></strong>. Enter it here to confirm the address is yours.</p>
+      <p class="notice" data-verify-notice role="status" hidden></p>
+      <form novalidate data-verify-form>
+        {{ ui.error_summary(forms.messages) }}
+        {% for f in forms.verify.fields %}
+        {{ ui.field(f, site.rule_kinds) }}
+        {% endfor %}
+        <p class="actions">
+          <button type="submit" class="button large">Confirm and continue</button>
+          <button type="button" class="button quiet" data-resend>Send a new code</button>
+        </p>
+      </form>
+    </section>
+    {% endif %}
+    <p class="help">Already signed up? {% if site.auth.client_id %}<a href="{{ routes.signin }}">{{ pages.signin.label }}</a>.{% else %}Sign-in opens with sign-up.{% endif %}</p>
+  </div>
+</section>
+{% endblock %}

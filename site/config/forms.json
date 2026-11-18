@@ -1,0 +1,762 @@
+{
+  "messages": {
+    "required": "Enter {label}",
+    "required_choice": "Choose {label}",
+    "required_tick": "Tick the box to continue",
+    "pattern": "{label} is not in the expected format",
+    "too_long": "{label} is too long",
+    "number": "{label} must be a number",
+    "too_small": "{label} must be {min} or more",
+    "too_large": "{label} must be {max} or less",
+    "summary_title": "There is a problem",
+    "fee_earner_required": "Add at least one fee earner",
+    "funding_required": "Choose at least one type of funding",
+    "too_short": "Use at least {min_length} characters",
+    "mismatch": "The two entries do not match",
+    "option": "Choose {label} from the list",
+    "invalid": "{label} is not valid",
+    "auth_exists": "There is already an account for this email address. Sign in instead.",
+    "auth_wrong": "The email address or password is not right",
+    "auth_code_wrong": "That code is not right. Check the email and try again.",
+    "auth_code_expired": "That code has expired. Ask for a new one.",
+    "auth_password_weak": "Choose a stronger password: use upper and lower case letters, a number and a symbol",
+    "auth_too_many": "Too many attempts. Wait a few minutes and try again.",
+    "auth_failed": "Something went wrong signing you in. Try again.",
+    "save_failed": "Your changes could not be saved. Try again.",
+    "code_sent": "We have sent a code to your email address.",
+    "reset_done": "Your password has been changed. Sign in with the new one.",
+    "too_many_rows": "There are too many fee earners"
+  },
+  "formats": {
+    "email": {
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "message": "Enter an email address in the format name@example.com"
+    },
+    "phone": {
+      "pattern": "^[0-9 +()-]{7,20}$",
+      "message": "Enter a phone number using digits, spaces and + ( ) - only"
+    },
+    "sra_number": {
+      "pattern": "^[0-9]{3,8}$",
+      "message": "Enter the SRA number as digits only"
+    },
+    "company_number": {
+      "pattern": "^[A-Za-z0-9]{8}$",
+      "message": "Enter the 8 character company number"
+    },
+    "postcode": {
+      "pattern": "^[A-Za-z]{1,2}[0-9][0-9A-Za-z]? ?[0-9][A-Za-z]{2}$",
+      "message": "Enter a full UK postcode"
+    },
+    "vat_number": {
+      "pattern": "^(GB)?[0-9]{9}$",
+      "message": "Enter the 9 digit VAT number"
+    },
+    "url": {
+      "pattern": "^(https?://)?[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(/\\S*)?$",
+      "message": "Enter a website address"
+    }
+  },
+  "address_parts": [
+    {
+      "suffix": "line1",
+      "label": "address line 1",
+      "required": true,
+      "autocomplete": "address-line1",
+      "max_length": 120
+    },
+    {
+      "suffix": "line2",
+      "label": "address line 2",
+      "required": false,
+      "autocomplete": "address-line2",
+      "max_length": 120
+    },
+    {
+      "suffix": "town",
+      "label": "town or city",
+      "required": true,
+      "autocomplete": "address-level2",
+      "max_length": 80
+    },
+    {
+      "suffix": "postcode",
+      "label": "postcode",
+      "required": true,
+      "autocomplete": "postal-code",
+      "format": "postcode",
+      "max_length": 10
+    }
+  ],
+  "signup": {
+    "steps": [
+      {
+        "id": "you",
+        "title": "About you",
+        "intro": "You will be the first person who can sign in for your firm.",
+        "fields": [
+          {
+            "id": "person_name",
+            "label": "full name",
+            "type": "text",
+            "required": true,
+            "autocomplete": "name",
+            "max_length": 120
+          },
+          {
+            "id": "person_role",
+            "label": "role at the firm",
+            "type": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "partner",
+                "label": "Partner or director"
+              },
+              {
+                "value": "solicitor",
+                "label": "Solicitor"
+              },
+              {
+                "value": "consultant",
+                "label": "Consultant solicitor"
+              },
+              {
+                "value": "practice_manager",
+                "label": "Practice manager"
+              },
+              {
+                "value": "biller",
+                "label": "Biller or costs draftsman"
+              },
+              {
+                "value": "other",
+                "label": "Other"
+              }
+            ]
+          },
+          {
+            "id": "person_email",
+            "label": "work email address",
+            "type": "email",
+            "required": true,
+            "format": "email",
+            "autocomplete": "email",
+            "max_length": 254,
+            "help": "This becomes your sign-in."
+          },
+          {
+            "id": "person_phone",
+            "label": "phone number",
+            "type": "tel",
+            "required": true,
+            "format": "phone",
+            "autocomplete": "tel"
+          },
+          {
+            "id": "person_sra_number",
+            "label": "your own SRA number",
+            "type": "text",
+            "required": false,
+            "format": "sra_number",
+            "inputmode": "numeric",
+            "help": "Optional. Only if you are a solicitor."
+          }
+        ],
+        "profile": true
+      },
+      {
+        "id": "firm",
+        "title": "Your firm",
+        "intro": "The firm that will hold the account.",
+        "fields": [
+          {
+            "id": "firm_name",
+            "label": "firm name",
+            "type": "text",
+            "required": true,
+            "autocomplete": "organization",
+            "max_length": 160,
+            "help": "As it appears on the SRA register."
+          },
+          {
+            "id": "firm_trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if it differs from the firm name."
+          },
+          {
+            "id": "firm_sra_number",
+            "label": "firm SRA number",
+            "type": "text",
+            "required": true,
+            "format": "sra_number",
+            "inputmode": "numeric"
+          },
+          {
+            "id": "firm_type",
+            "label": "type of firm",
+            "type": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "sole_practice",
+                "label": "Sole practice"
+              },
+              {
+                "value": "partnership",
+                "label": "Partnership"
+              },
+              {
+                "value": "llp",
+                "label": "Limited liability partnership (LLP)"
+              },
+              {
+                "value": "limited",
+                "label": "Limited company"
+              }
+            ]
+          },
+          {
+            "id": "firm_company_number",
+            "label": "company number",
+            "type": "text",
+            "required": true,
+            "format": "company_number",
+            "show_if": {
+              "field": "firm_type",
+              "in": [
+                "llp",
+                "limited"
+              ]
+            }
+          },
+          {
+            "id": "firm_office",
+            "label": "Office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "firm_correspondence_same",
+            "label": "Send post to the office address",
+            "type": "checkbox",
+            "required": false,
+            "default": true
+          },
+          {
+            "id": "firm_correspondence",
+            "label": "Correspondence address",
+            "type": "address",
+            "required": true,
+            "show_if": {
+              "field": "firm_correspondence_same",
+              "equals": false
+            }
+          },
+          {
+            "id": "firm_website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          }
+        ],
+        "profile": true
+      },
+      {
+        "id": "signin",
+        "title": "Your sign-in",
+        "requires": "auth",
+        "intro": "You will sign in with your email address and this password.",
+        "fields": [
+          {
+            "type": "password",
+            "secret": true,
+            "required": true,
+            "min_length_key": "auth.password_min_length",
+            "max_length": 200,
+            "id": "person_password",
+            "label": "password",
+            "autocomplete": "new-password",
+            "help": "Use upper and lower case letters, a number and a symbol."
+          },
+          {
+            "id": "person_password_again",
+            "label": "password again",
+            "type": "password",
+            "secret": true,
+            "required": true,
+            "autocomplete": "new-password",
+            "matches": "person_password",
+            "max_length": 200
+          }
+        ]
+      },
+      {
+        "id": "confirm",
+        "title": "Confirm",
+        "intro": "Check your details, then confirm.",
+        "fields": [
+          {
+            "id": "payment_note",
+            "type": "note",
+            "label": "Payment",
+            "text": "Card payment will be taken here when sign-up opens, on our payment provider's own page. We never see or store card numbers. No payment is taken in this preview.",
+            "requires": "payment"
+          },
+          {
+            "id": "confirm_authorised",
+            "label": "I am authorised to sign this firm up",
+            "type": "checkbox",
+            "required": true
+          }
+        ],
+        "title_when": {
+          "payment": "Payment and confirm"
+        }
+      }
+    ]
+  },
+  "company": {
+    "sections": [
+      {
+        "id": "billing",
+        "title": "Billing set-up",
+        "intro": "These appear on every bill the product drafts.",
+        "fields": [
+          {
+            "id": "laa_account_number",
+            "label": "LAA account number",
+            "type": "text",
+            "required": true,
+            "max_length": 20,
+            "show_if": {
+              "field": "funding_legal_aid",
+              "equals": true
+            }
+          },
+          {
+            "id": "office_region",
+            "label": "office region",
+            "type": "radio",
+            "required": true,
+            "help": "This sets which legal aid hourly rates apply.",
+            "options": [
+              {
+                "value": "London",
+                "label": "London"
+              },
+              {
+                "value": "Non-London",
+                "label": "Outside London"
+              }
+            ]
+          },
+          {
+            "id": "vat_registered",
+            "label": "The firm is registered for VAT",
+            "type": "checkbox",
+            "required": false,
+            "default": true
+          },
+          {
+            "id": "vat_number",
+            "label": "VAT number",
+            "type": "text",
+            "required": true,
+            "format": "vat_number",
+            "show_if": {
+              "field": "vat_registered",
+              "equals": true
+            }
+          },
+          {
+            "id": "bills_per_month",
+            "label": "rough number of bills a month",
+            "type": "number",
+            "required": false,
+            "min": 0,
+            "max": 5000,
+            "help": "Optional. A guess is fine."
+          },
+          {
+            "id": "invoice_contact_name",
+            "label": "invoice contact name",
+            "type": "text",
+            "required": false,
+            "max_length": 120,
+            "help": "Optional. Leave blank to send invoices to you."
+          },
+          {
+            "id": "invoice_contact_email",
+            "label": "invoice contact email",
+            "type": "email",
+            "required": false,
+            "format": "email",
+            "max_length": 254
+          }
+        ]
+      }
+    ],
+    "funding": {
+      "title": "Types of funding",
+      "intro": "Choose the kinds of case your firm will use the product for. You only fill in the sections for the ones you choose.",
+      "fields": [
+        {
+          "id": "funding_legal_aid",
+          "label": "Legal aid cases",
+          "type": "checkbox",
+          "required": false,
+          "default": true
+        },
+        {
+          "id": "funding_private",
+          "label": "Privately funded cases",
+          "type": "checkbox",
+          "required": false,
+          "default": false
+        }
+      ]
+    },
+    "fee_earners": {
+      "title": "Fee earners",
+      "intro": "The people whose work appears on bills. Rates are only needed for privately funded work; legal aid rates are set by the Legal Aid Agency.",
+      "add_label": "Add a fee earner",
+      "remove_label": "Remove",
+      "row_title": "Fee earner",
+      "fields": [
+        {
+          "id": "name",
+          "label": "name",
+          "type": "text",
+          "required": true,
+          "max_length": 120
+        },
+        {
+          "id": "initials",
+          "label": "initials",
+          "type": "text",
+          "required": true,
+          "max_length": 6
+        },
+        {
+          "id": "grade",
+          "label": "grade",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "value": "A",
+              "label": "Grade A (most senior)"
+            },
+            {
+              "value": "B",
+              "label": "Grade B"
+            },
+            {
+              "value": "C",
+              "label": "Grade C"
+            },
+            {
+              "value": "D",
+              "label": "Grade D (trainees and paralegals)"
+            }
+          ]
+        },
+        {
+          "id": "panel_member",
+          "label": "Member of a relevant accreditation panel",
+          "type": "checkbox",
+          "required": false,
+          "default": false
+        },
+        {
+          "id": "own_terms",
+          "label": "Manages their own rates and terms (consultant)",
+          "type": "checkbox",
+          "required": false,
+          "default": false,
+          "help": "Tick for a consultant who sets their own private-client rates. They fill these in themselves."
+        },
+        {
+          "id": "hourly_rate",
+          "label": "private hourly rate in pounds",
+          "type": "number",
+          "required": false,
+          "min": 0,
+          "max": 2000,
+          "help": "Optional. Leave blank to use the firm's rate for the grade.",
+          "show_if": {
+            "field": "own_terms",
+            "equals": false
+          }
+        }
+      ]
+    },
+    "legal_aid": {
+      "title": "Legal aid positions",
+      "intro": "Most legal aid rules have one answer and the product applies them as written. These are the rules that leave your firm a choice, or where the published guidance is not clear. Each starts on the cautious answer.",
+      "show_if": {
+        "field": "funding_legal_aid",
+        "equals": true
+      },
+      "per_case_note": "This is decided for each case, not for the firm. You will be asked when you create a case.",
+      "positions": {
+        "UNITS-6MIN": {
+          "question": "when recorded time does not fall on a six-minute unit, how it is rounded",
+          "options": {
+            "round_down": "Round down, so the bill never claims more than the time recorded",
+            "nearest_half_down": "To the nearest unit, with exact halves rounded down",
+            "nearest_half_up": "To the nearest unit, with exact halves rounded up"
+          }
+        },
+        "ROUTINE-COUNT": {
+          "question": "how one email or letter sent to several people is counted",
+          "options": {
+            "per_message": "As one item, however many people it went to",
+            "per_recipient": "As one item for each person it went to"
+          }
+        },
+        "LONG-CALLS": {
+          "question": "how a phone call of six minutes or more is claimed",
+          "options": {
+            "timed_attendance": "As timed attendance at the hourly rate",
+            "routine_call": "As a routine call at the fixed item fee"
+          }
+        },
+        "ENH-CLAIM": {
+          "question": "whether enhancement is claimed, and at what level",
+          "per_case": true
+        },
+        "ENH-SCOPE": {
+          "question": "which work enhancement is applied to, when it is claimed",
+          "options": {
+            "timed_preparation_and_attendance": "Timed preparation and attendance only",
+            "include_routine_items": "Also routine letters and calls",
+            "include_travel_and_waiting": "Also travel and waiting",
+            "include_routine_travel_and_waiting": "Also routine items, travel and waiting"
+          }
+        },
+        "BILL-PREP-TIME": {
+          "question": "minutes claimed for preparing the bill",
+          "number": {
+            "min": 0,
+            "max": 600,
+            "default": 30
+          }
+        }
+      }
+    },
+    "private": {
+      "title": "Private client charging",
+      "intro": "How your firm charges privately funded clients. This section is still being designed and will change.",
+      "show_if": {
+        "field": "funding_private",
+        "equals": true
+      },
+      "fields": [
+        {
+          "id": "private_unit_minutes",
+          "label": "length of one time unit in minutes",
+          "type": "number",
+          "required": true,
+          "min": 1,
+          "max": 60,
+          "default": 6
+        },
+        {
+          "id": "private_rate_a",
+          "label": "hourly rate for grade A in pounds",
+          "type": "number",
+          "required": true,
+          "min": 0,
+          "max": 2000
+        },
+        {
+          "id": "private_rate_b",
+          "label": "hourly rate for grade B in pounds",
+          "type": "number",
+          "required": true,
+          "min": 0,
+          "max": 2000
+        },
+        {
+          "id": "private_rate_c",
+          "label": "hourly rate for grade C in pounds",
+          "type": "number",
+          "required": true,
+          "min": 0,
+          "max": 2000
+        },
+        {
+          "id": "private_rate_d",
+          "label": "hourly rate for grade D in pounds",
+          "type": "number",
+          "required": true,
+          "min": 0,
+          "max": 2000
+        },
+        {
+          "id": "private_letters_out",
+          "label": "how letters and emails sent are charged",
+          "type": "radio",
+          "required": true,
+          "options": [
+            {
+              "value": "one_unit",
+              "label": "One unit each"
+            },
+            {
+              "value": "timed",
+              "label": "By the time recorded"
+            }
+          ]
+        },
+        {
+          "id": "private_letters_in",
+          "label": "how letters and emails received are charged",
+          "type": "radio",
+          "required": true,
+          "options": [
+            {
+              "value": "not_charged",
+              "label": "Not charged"
+            },
+            {
+              "value": "half_unit",
+              "label": "Half a unit each"
+            },
+            {
+              "value": "one_unit",
+              "label": "One unit each"
+            }
+          ]
+        },
+        {
+          "id": "private_calls",
+          "label": "how short phone calls are charged",
+          "type": "radio",
+          "required": true,
+          "options": [
+            {
+              "value": "one_unit",
+              "label": "One unit each"
+            },
+            {
+              "value": "timed",
+              "label": "By the time recorded"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "agreement": {
+    "fields": [
+      {
+        "id": "accept_name",
+        "label": "your full name",
+        "type": "text",
+        "required": true,
+        "autocomplete": "name",
+        "max_length": 120
+      },
+      {
+        "id": "accept_tick",
+        "label": "I have read the agreement and accept it on behalf of the firm",
+        "type": "checkbox",
+        "required": true
+      }
+    ]
+  },
+  "verify": {
+    "fields": [
+      {
+        "type": "text",
+        "required": true,
+        "inputmode": "numeric",
+        "autocomplete": "one-time-code",
+        "max_length": 10,
+        "pattern": "^[0-9]{6}$",
+        "pattern_message": "Enter the 6 digit code from the email",
+        "id": "verify_code",
+        "label": "the code from the email"
+      }
+    ]
+  },
+  "signin": {
+    "fields": [
+      {
+        "type": "email",
+        "required": true,
+        "format": "email",
+        "autocomplete": "email",
+        "max_length": 200,
+        "id": "signin_email",
+        "label": "email address"
+      },
+      {
+        "id": "signin_password",
+        "label": "password",
+        "type": "password",
+        "secret": true,
+        "required": true,
+        "autocomplete": "current-password",
+        "max_length": 200
+      }
+    ]
+  },
+  "reset": {
+    "request": [
+      {
+        "type": "email",
+        "required": true,
+        "format": "email",
+        "autocomplete": "email",
+        "max_length": 200,
+        "id": "reset_email",
+        "label": "email address"
+      }
+    ],
+    "confirm": [
+      {
+        "type": "text",
+        "required": true,
+        "inputmode": "numeric",
+        "autocomplete": "one-time-code",
+        "max_length": 10,
+        "pattern": "^[0-9]{6}$",
+        "pattern_message": "Enter the 6 digit code from the email",
+        "id": "reset_code",
+        "label": "the code from the email"
+      },
+      {
+        "type": "password",
+        "secret": true,
+        "required": true,
+        "min_length_key": "auth.password_min_length",
+        "max_length": 200,
+        "id": "reset_password",
+        "label": "new password",
+        "autocomplete": "new-password",
+        "help": "Use upper and lower case letters, a number and a symbol."
+      },
+      {
+        "id": "reset_password_again",
+        "label": "new password again",
+        "type": "password",
+        "secret": true,
+        "required": true,
+        "autocomplete": "new-password",
+        "matches": "reset_password",
+        "max_length": 200
+      }
+    ]
+  }
+}

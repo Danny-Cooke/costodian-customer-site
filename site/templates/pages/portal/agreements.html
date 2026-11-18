@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% import "partials/fields.html" as ui %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ site.agreement.title }}</h1>
+    <p class="lead">Your firm decides what happens to its clients' data. We process it for you, on your instructions. This agreement sets that out.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    {% if site.agreement.draft %}
+    <p class="notice"><strong>Draft for discussion.</strong> This text describes how the product is designed to work. It has not been reviewed by a solicitor and is not yet the agreement firms will be asked to accept.</p>
+    {% endif %}
+
+    <article class="agreement" aria-label="{{ site.agreement.title }}">
+      <p class="version">Version {{ site.agreement.version }}</p>
+
+      <h2>1. Who is who</h2>
+      <p>Your firm is the controller of the personal data in the case files it uploads. {{ site.company.name }}, which provides {{ site.product.name }}, is the processor. This agreement applies alongside the terms of service.</p>
+
+      <h2>2. What we process, and why</h2>
+      <p>We process the case files your firm uploads, and the facts, drafts, reports and records produced from them, for one purpose: drafting bills of costs for your firm and showing how each figure was reached. The files may include special category data and data about children.</p>
+
+      <h2>3. Your instructions</h2>
+      <p>We process the data only on your firm's documented instructions, which are given by using the product. We will tell you if we believe an instruction breaks data protection law.</p>
+
+      <h2>4. Where the data is held</h2>
+      <p>All data is held in {{ site.hosting.country }}, in an environment created for your firm alone, and encrypted with keys dedicated to your firm. We do not move case files outside {{ site.hosting.country }}.</p>
+
+      <h2>5. Who else handles the data</h2>
+      <p>We use a small number of sub-processors, for hosting and for taking payment. All of your firm's case data stays within {{ site.hosting.country }}. The current list is given to your firm on request, and we give you notice before adding or replacing one, so that you may object.</p>
+
+      <h2>6. Security</h2>
+      <p>We keep the data encrypted at rest and in transit, require two-step sign-in for every user, grant access by role on least privilege, and keep a record of each step taken on a case. The AI models that read case files are hosted within {{ site.hosting.country }}, do not learn from the data and do not store it. Case files are not used to train models.</p>
+
+      <h2>7. Our people</h2>
+      <p>Anyone on our side who can reach your firm's data is bound by a duty of confidentiality and reaches it only when needed to provide or support the service.</p>
+
+      <h2>8. If something goes wrong</h2>
+      <p>We will tell you without undue delay after becoming aware of a personal data breach affecting your firm's data, with what we know about what happened and what we are doing about it.</p>
+
+      <h2>9. Helping you meet your duties</h2>
+      <p>We will help you respond to requests from people about their data, and with data protection impact assessments, as far as the product allows. You may audit how we meet this agreement on reasonable notice.</p>
+
+      <h2>10. How long we keep it</h2>
+      <p>We keep case files and the record of each bill for {{ site.retention.years }} years after a case is completed, and then delete them.</p>
+
+      <h2>11. When you leave</h2>
+      <p>When your firm closes its account, we return or delete its data at your choice, and close the environment that held it, unless the law requires us to keep something.</p>
+    </article>
+
+    <div class="panel success" data-accepted role="status" tabindex="-1" hidden>
+      <h2>Agreement accepted</h2>
+      <p>Accepted by <strong data-accepted-name></strong> on <span data-accepted-at></span>, version {{ site.agreement.version }}.</p>
+      <p class="actions">
+        <button type="button" class="button quiet" data-print>Print or save a copy</button>
+        <a href="{{ routes.portal }}">Back to set-up</a>
+      </p>
+    </div>
+
+    <form novalidate data-form>
+      <h2>Accept the agreement</h2>
+      {{ ui.error_summary(forms.messages) }}
+      {% for f in forms.agreement.fields %}
+      {{ ui.field(f, site.rule_kinds) }}
+      {% endfor %}
+      <p class="actions"><button type="submit" class="button large">Accept the agreement</button></p>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,71 @@
+{
+  "register_version": "2026-11-15.2",
+  "rules": [
+    {
+      "id": "UNITS-6MIN",
+      "title": "Time is recorded in six-minute units",
+      "source": "Costs Assessment Guidance 2024, Part A 1.18",
+      "text": "In Contract work, routine letters and telephone calls are remunerated on a fee per item basis. Other preparation and attendances are generally recorded in units of 6 minutes per time spent, payable according to the appropriate hourly rate.",
+      "kind": "unclear",
+      "note": "The guidance does not say how a time recorded in other intervals is converted. The standard position never claims more than the recorded time.",
+      "options": [
+        "round_down",
+        "nearest_half_down",
+        "nearest_half_up"
+      ],
+      "default": "round_down"
+    },
+    {
+      "id": "ROUTINE-COUNT",
+      "title": "How one message sent to several people is counted",
+      "source": "No rule text found in the sources read",
+      "text": "(The LAA documents read do not say whether one email copied to several recipients is one routine letter or several.)",
+      "kind": "unclear",
+      "options": [
+        "per_message",
+        "per_recipient"
+      ],
+      "default": "per_message"
+    },
+    {
+      "id": "LONG-CALLS",
+      "title": "Calls of six minutes or more",
+      "source": "Costs Assessment Guidance 2024, Part A 2.25",
+      "text": "In relation to long calls any call of six minutes or more in length may be claimed as a timed attendance, but not also as a telephone call.",
+      "kind": "judgment",
+      "options": [
+        "timed_attendance",
+        "routine_call"
+      ],
+      "default": "timed_attendance"
+    },
+    {
+      "id": "ENH-CLAIM",
+      "title": "The provider claims enhancement and states the level",
+      "source": "Costs Assessment Guidance 2024, Part C 12.1",
+      "text": "It is for the provider to claim enhancement where he or she considers that it is justified and to indicate the level of enhancement sought.",
+      "kind": "judgment"
+    },
+    {
+      "id": "ENH-SCOPE",
+      "title": "Which work enhancement is applied to",
+      "source": "Costs Assessment Guidance 2024, Part C 12.17",
+      "text": "Enhancement rates can be applied to the whole case, to classes of work or to individual items. In general, one of the latter two approaches is likely to apply. It would be less usual to allow enhancement on routine letters or telephone calls or travel and waiting.",
+      "kind": "judgment",
+      "options": [
+        "timed_preparation_and_attendance",
+        "include_routine_items",
+        "include_travel_and_waiting",
+        "include_routine_travel_and_waiting"
+      ],
+      "default": "timed_preparation_and_attendance"
+    },
+    {
+      "id": "BILL-PREP-TIME",
+      "title": "How much time for preparing the bill",
+      "source": "Costs Assessment Guidance 2024, Part C 15.12",
+      "text": "In the majority of cases an allowance of 30 - 60 minutes will be appropriate. Where a greater time is claimed, the provider should justify the additional time spent with reference to the circumstances of the individual case. ... A lengthier amount of time will be allowable where the assessable costs exceed £2,500.",
+      "kind": "judgment"
+    }
+  ]
+}

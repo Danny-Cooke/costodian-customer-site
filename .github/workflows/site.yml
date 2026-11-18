@@ -1,0 +1,333 @@
+name: Customer site
+
+# Tests, plans and deploys the customer site into one AWS account,
+# through roles assumed with GitHub's own identity token. No AWS keys are stored.
+#
+# Two GitHub environments, each tied to its own role (see runbooks/bootstrap.md):
+#
+#   dev-plan   read-only role, used to plan on a pull request
+#   dev        the role that changes things, used to deploy from main
+#
+# Both environments hold these Variables:
+#
+#   AWS_ROLE_ARN      the role for that environment
+#   AWS_REGION        must equal platform.region in infra/envs/dev/platform.tfvars.json;
+#                     the deploy job checks it against the Terraform output
+#   TF_STATE_BUCKET   the state bucket
+#   TF_STATE_KEY      the state key of the site stack
+#
+# The dev environment may also hold these, all optional. Each overrides one
+# value in site/config/site.json at build time:
+#
+#   SITE_PRICE_PER_BILL    the price shown on the pricing page
+#   SITE_REFUND_DAYS       the refund period shown on the pricing page
+#   SITE_CONTACT_EMAIL     the contact address shown in the footer
+#   SITE_PREVIEW_ENABLED   false to take the preview banner down
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('site-pr-{0}', github.event.number) || 'site-deploy' }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  TERRAFORM_VERSION: "1.10.5"
+  ENV_DIR: infra/envs/dev
+  STACK_DIR: infra/envs/dev/site
+  PLATFORM_VARS: ../platform.tfvars.json
+  DIST_DIR: dist
+  # A second build with sign-in switched on, for the browser-side tests only.
+  DIST_LIVE_DIR: dist-live
+  TEST_AUTH_CLIENT_ID: test-client
+  TEST_AUTH_ENDPOINT: https://auth.test/
+  API_PACKAGE_DIR: build/api
+  STATIC_PREFIX: static
+  HTML_CACHE_CONTROL: "no-cache"
+  STATIC_CACHE_CONTROL: "public, max-age=300"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "0"
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Install the build and test tools
+        run: |
+          pip install -e ".[dev]"
+          npm ci
+
+      - name: Lint and format
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Build and form tests
+        run: pytest -q
+
+      - name: Build the site, as a preview and with sign-in switched on
+        run: |
+          python tools/build.py --out "$DIST_DIR"
+          python tools/build.py --out "$DIST_LIVE_DIR" \
+            --set "auth.client_id=$TEST_AUTH_CLIENT_ID" --set "auth.endpoint=$TEST_AUTH_ENDPOINT"
+
+      - name: Browser-side tests against the built pages
+        run: npm test
+
+      # Terraform zips this folder, so it has to exist before validate and plan.
+      - name: Build the API package
+        run: python tools/build_api.py --out "$API_PACKAGE_DIR"
+
+      - name: Terraform format
+        run: terraform fmt -check -recursive infra
+
+      - name: Terraform validate
+        run: |
+          for stack in "$ENV_DIR"/*/; do
+            terraform -chdir="$stack" init -backend=false
+            terraform -chdir="$stack" validate
+          done
+
+  plan:
+    name: Terraform plan
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev-plan
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: The environment must name the role and the state
+        env:
+          ROLE: ${{ vars.AWS_ROLE_ARN }}
+          REGION: ${{ vars.AWS_REGION }}
+          BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          KEY: ${{ vars.TF_STATE_KEY }}
+        run: |
+          for pair in "AWS_ROLE_ARN=$ROLE" "AWS_REGION=$REGION" "TF_STATE_BUCKET=$BUCKET" "TF_STATE_KEY=$KEY"; do
+            if [ -z "${pair#*=}" ]; then
+              echo "::error::${pair%%=*} is not set on the dev-plan environment. See runbooks/bootstrap.md."
+              exit 1
+            fi
+          done
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Terraform zips this folder, so it has to exist before plan and apply.
+      - name: Build the API package
+        run: |
+          pip install -e .
+          python tools/build_api.py --out "$API_PACKAGE_DIR"
+
+      - name: Terraform init
+        working-directory: ${{ env.STACK_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
+
+      - name: Terraform plan
+        working-directory: ${{ env.STACK_DIR }}
+        # The plan job's role is read-only and is used directly.
+        run: terraform plan -var-file="$PLATFORM_VARS" -var="assume_service_roles=false"
+
+  deploy:
+    name: Deploy
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: The environment must name the role and the state
+        env:
+          ROLE: ${{ vars.AWS_ROLE_ARN }}
+          REGION: ${{ vars.AWS_REGION }}
+          BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          KEY: ${{ vars.TF_STATE_KEY }}
+          PUBLISH: ${{ vars.AWS_PUBLISH_ROLE_ARN }}
+        run: |
+          for pair in "AWS_ROLE_ARN=$ROLE" "AWS_REGION=$REGION" "TF_STATE_BUCKET=$BUCKET" "TF_STATE_KEY=$KEY" "AWS_PUBLISH_ROLE_ARN=$PUBLISH"; do
+            if [ -z "${pair#*=}" ]; then
+              echo "::error::${pair%%=*} is not set on the dev environment. See runbooks/bootstrap.md."
+              exit 1
+            fi
+          done
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Terraform zips this folder, so it has to exist before plan and apply.
+      - name: Build the API package
+        run: |
+          pip install -e .
+          python tools/build_api.py --out "$API_PACKAGE_DIR"
+
+      - name: Terraform init
+        working-directory: ${{ env.STACK_DIR }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
+
+      - name: Terraform apply
+        working-directory: ${{ env.STACK_DIR }}
+        # The deploy role can do nothing itself: each provider assumes the role
+        # for its own service.
+        run: terraform apply -auto-approve -var-file="$PLATFORM_VARS" -var="assume_service_roles=true"
+
+      - name: Read the stack outputs
+        id: stack
+        working-directory: ${{ env.STACK_DIR }}
+        run: |
+          {
+            echo "region=$(terraform output -raw aws_region)"
+            echo "bucket=$(terraform output -raw bucket_name)"
+            echo "distribution=$(terraform output -raw distribution_id)"
+            echo "url=$(terraform output -raw site_url)"
+            echo "client_id=$(terraform output -raw user_pool_client_id)"
+            echo "auth_endpoint=$(terraform output -raw cognito_endpoint)"
+            echo "password_min_length=$(terraform output -raw password_minimum_length)"
+            echo "redirect=$(terraform output -raw krystal_redirect_line)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: The workflow's Region must be the stack's Region
+        env:
+          STACK_REGION: ${{ steps.stack.outputs.region }}
+          WORKFLOW_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          if [ "$STACK_REGION" != "$WORKFLOW_REGION" ]; then
+            echo "::error::AWS_REGION is $WORKFLOW_REGION but the stack is in $STACK_REGION."
+            exit 1
+          fi
+
+      - name: Build the site
+        working-directory: ${{ github.workspace }}
+        env:
+          AUTH_CLIENT_ID: ${{ steps.stack.outputs.client_id }}
+          AUTH_ENDPOINT: ${{ steps.stack.outputs.auth_endpoint }}
+          PASSWORD_MIN_LENGTH: ${{ steps.stack.outputs.password_min_length }}
+          PRICE_PER_BILL: ${{ vars.SITE_PRICE_PER_BILL }}
+          REFUND_DAYS: ${{ vars.SITE_REFUND_DAYS }}
+          CONTACT_EMAIL: ${{ vars.SITE_CONTACT_EMAIL }}
+          PREVIEW_ENABLED: ${{ vars.SITE_PREVIEW_ENABLED }}
+        run: |
+          overrides=(
+            --set "auth.client_id=$AUTH_CLIENT_ID"
+            --set "auth.endpoint=$AUTH_ENDPOINT"
+            --set "auth.password_min_length=$PASSWORD_MIN_LENGTH"
+          )
+          [ -n "$PRICE_PER_BILL" ] && overrides+=(--set "pricing.per_bill=$PRICE_PER_BILL")
+          [ -n "$REFUND_DAYS" ] && overrides+=(--set "pricing.refund_days=$REFUND_DAYS")
+          [ -n "$CONTACT_EMAIL" ] && overrides+=(--set "company.contact_email=$CONTACT_EMAIL")
+          [ -n "$PREVIEW_ENABLED" ] && overrides+=(--set "preview.enabled=$PREVIEW_ENABLED")
+          python tools/build.py --out "$DIST_DIR" "${overrides[@]}"
+
+      # From here on the job is the publish role: it can write the site's files
+      # and clear the cache, and nothing else. It cannot read the Terraform
+      # state, which is why the outputs were read above.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-chaining: true
+
+      # Pages are never cached by the browser, so a deploy shows at once; the
+      # stylesheet and scripts are cached briefly. Anything no longer built is
+      # removed from the bucket.
+      - name: Publish the site
+        env:
+          BUCKET: ${{ steps.stack.outputs.bucket }}
+        run: |
+          aws s3 sync "$DIST_DIR/$STATIC_PREFIX" "s3://$BUCKET/$STATIC_PREFIX" \
+            --delete --cache-control "$STATIC_CACHE_CONTROL"
+          aws s3 sync "$DIST_DIR" "s3://$BUCKET" \
+            --delete --exclude "$STATIC_PREFIX/*" --cache-control "$HTML_CACHE_CONTROL"
+
+      - name: Clear the CloudFront cache
+        env:
+          DISTRIBUTION: ${{ steps.stack.outputs.distribution }}
+        run: |
+          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths "/*" \
+            --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION" --id "$id"
+
+      - name: Smoke test the live site
+        env:
+          SITE_URL: ${{ steps.stack.outputs.url }}
+        run: python tools/smoke.py "$SITE_URL"
+
+      - name: Where it is
+        env:
+          SITE_URL: ${{ steps.stack.outputs.url }}
+          REDIRECT: ${{ steps.stack.outputs.redirect }}
+        run: |
+          {
+            echo "### Deployed"
+            echo ""
+            echo "Site: $SITE_URL"
+            echo ""
+            echo "Redirect line for the main website's .htaccess:"
+            echo ""
+            echo '```'
+            echo "$REDIRECT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,13 @@
+{
+  "name": "draftsman-customer-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-side tests for the customer site. The site itself has no runtime dependencies.",
+  "scripts": {
+    "test": "node --test \"tests/js/*.test.mjs\""
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

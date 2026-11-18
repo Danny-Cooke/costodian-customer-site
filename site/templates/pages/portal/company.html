@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% import "partials/fields.html" as ui %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">How your firm bills. This is entered once and used for every case.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <div class="panel success" data-saved role="status" tabindex="-1" hidden>
+      <h2>Company information saved</h2>
+      <p><a href="{{ routes.portal }}">Back to set-up</a></p>
+    </div>
+
+    <form novalidate data-form>
+      {{ ui.error_summary(forms.messages) }}
+
+      {% for section in forms.company.sections %}
+      <section class="form-section" data-section="{{ section.id }}" aria-labelledby="section-{{ section.id }}">
+        <h2 id="section-{{ section.id }}">{{ section.title }}</h2>
+        {% if section.intro %}<p>{{ section.intro }}</p>{% endif %}
+        {% if section.id == 'funding' %}<p class="error" data-funding-error hidden></p>{% endif %}
+        {% for f in section.fields %}
+        {{ ui.field(f, site.rule_kinds) }}
+        {% endfor %}
+        {% if section.kind == 'positions' %}
+        <p class="help">Rule wording from the {{ site.product.name }} rule register, version {{ forms.register_version }}.</p>
+        {% endif %}
+      </section>
+
+      {% if section.id == 'billing' %}
+      {% set earners = forms.company.fee_earners %}
+      <section class="form-section" data-fee-earners aria-labelledby="section-fee-earners">
+        <h2 id="section-fee-earners">{{ earners.title }}</h2>
+        <p>{{ earners.intro }}</p>
+        <p class="error" data-fee-earners-error hidden></p>
+        <div data-rows></div>
+        <p><button type="button" class="button quiet" data-add-row>{{ earners.add_label }}</button></p>
+        <template data-row-template>
+          <fieldset class="group row" data-row>
+            <legend>{{ earners.row_title }}</legend>
+            {% for f in earners.fields %}
+            {{ ui.field(f, site.rule_kinds, 'earner-__row__-') }}
+            {% endfor %}
+            <p><button type="button" class="button quiet small" data-remove-row>{{ earners.remove_label }}</button></p>
+          </fieldset>
+        </template>
+      </section>
+      {% endif %}
+      {% endfor %}
+
+      <p class="actions"><button type="submit" class="button large">Save company information</button></p>
+    </form>
+  </div>
+</section>
+{% endblock %}
