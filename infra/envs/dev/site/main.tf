@@ -12,6 +12,7 @@ module "web" {
   platform  = local.platform
   component = var.components.web
 
+  force_destroy           = var.web_bucket_force_destroy
   index_document          = var.index_document
   not_found_document      = var.not_found_document
   not_found_error_codes   = var.not_found_error_codes

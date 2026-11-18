@@ -1,163 +1,218 @@
 #!/usr/bin/env bash
 #
-# scripts/destroy.sh <environment>
+# scripts/destroy.sh <environment> <site|bootstrap>
 #
-# The documented reverse of scripts/bootstrap.sh: takes the site down, then the
-# pipeline's footing. Run by a person with an administrator profile exported,
-# because the roles it is destroying are the ones the pipeline would use.
+# The reverse of the Bootstrap and Site workflows, in two halves, because in
+# GitHub each half runs as a different identity and the Destroy workflow runs
+# them as two jobs:
 #
-#   export AWS_PROFILE=<an administrator profile>
-#   scripts/destroy.sh dev
+#   site       the site, the sign-up API, the Cognito pool, the account table
+#              and its key. Run as the deploy role, with each provider chaining
+#              into its own service role, so the destroy is done by the same
+#              identities that did the create.
+#   bootstrap  the pipeline's roles and the state bucket. Run as the seed's
+#              bootstrap role.
 #
-# It destroys customer-facing infrastructure, including the account table and
-# the sign-in pool, so it asks for the project's name to be typed before it
-# does anything. Nothing about it is automatic and no workflow calls it.
+# Neither half touches the seed: GitHub's sign-in to the account and the
+# bootstrap role itself are left in place, so the Bootstrap workflow can build
+# it all again.
+#
+# It destroys customer-facing infrastructure, so it will not run unless it is
+# told what it is destroying:
+#
+#   CONFIRM_PROJECT        must equal the project name. There is no prompt.
+#   ASSUME_SERVICE_ROLES   true in the pipeline, where the job holds the deploy
+#                          role; false when a run already holds credentials
+#                          that can do the work themselves.
+#   AWS_ACCOUNT_ID         optional; asked of AWS when it is not set.
+#   GITHUB_SUBJECT_PREFIX  optional; only the trust policies read it, and they
+#                          are being destroyed.
 
 set -euo pipefail
 
+SCRIPT_NAME=destroy
+
+# shellcheck source=lib/stack.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/stack.sh"
+
+trap remove_overrides EXIT
+
 usage() {
   cat >&2 <<'EOF'
-usage: scripts/destroy.sh <environment>
+usage: scripts/destroy.sh <environment> <site|bootstrap>
 
   <environment>  the environment token, e.g. dev.
+  site           destroys the site stack, as the deploy role.
+  bootstrap      destroys the pipeline's roles and the state bucket, as the
+                 bootstrap role. Run it after site.
 
-Destroys the site stack and then the bootstrap stack. Asks for the project
-name to be typed first.
+Requires CONFIRM_PROJECT to equal the project name, and AWS credentials
+already in the environment.
 EOF
   exit 2
 }
 
-[ "$#" -eq 1 ] || usage
+[ "$#" -eq 2 ] || usage
 environment=$1
+half=$2
 
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-env_dir="$repo_root/infra/envs/$environment"
-bootstrap_dir="$env_dir/bootstrap"
-site_dir="$env_dir/site"
-platform_vars="../platform.tfvars.json"
-override_file="$bootstrap_dir/backend_override.tf"
+case "$half" in
+site | bootstrap) ;;
+*) usage ;;
+esac
 
-for tool in terraform aws jq; do
-  command -v "$tool" >/dev/null 2>&1 || {
-    echo "destroy: $tool is not on PATH." >&2
-    exit 1
-  }
-done
+require_tools terraform aws python3
 
-if [ ! -d "$bootstrap_dir" ] || [ ! -d "$site_dir" ]; then
-  echo "destroy: no environment at $env_dir." >&2
-  exit 1
-fi
+bootstrap_stack=$(stack_dir "$environment" bootstrap)
+site_stack=$(stack_dir "$environment" site)
 
-[ -n "${AWS_PROFILE:-}" ] || {
-  echo "destroy: export AWS_PROFILE with an administrator profile for the account first." >&2
-  exit 1
-}
-
-tf_bootstrap() {
-  terraform -chdir="$bootstrap_dir" "$@"
-}
-
-tf_site() {
-  terraform -chdir="$site_dir" "$@"
-}
-
-tf_console() {
-  printf '%s\n' "$2" | terraform -chdir="$1" console -no-color -var-file="$platform_vars" | tr -d '"'
-}
-
-# A versioned bucket cannot be deleted until every version and delete marker
-# is gone, and Terraform will not empty one it did not fill.
+# A versioned bucket cannot be deleted until every version and delete marker is
+# gone. Terraform empties the site bucket itself, under the storage role, when
+# web_bucket_force_destroy is set; the state bucket is emptied here, because by
+# then it is out of Terraform's hands.
 empty_bucket() {
-  local bucket=$1 payload count
+  local bucket=$1
   aws s3api head-bucket --bucket "$bucket" >/dev/null 2>&1 || return 0
+  python3 - "$bucket" <<'PY'
+import json
+import subprocess
+import sys
 
-  while :; do
-    payload=$(aws s3api list-object-versions --bucket "$bucket" --max-keys 500 --output json |
-      jq -c '{Objects: [(.Versions // []), (.DeleteMarkers // [])] | add | map({Key, VersionId})}')
-    count=$(jq '.Objects | length' <<<"$payload")
-    if [ "$count" -eq 0 ]; then
-      break
-    fi
-    aws s3api delete-objects --bucket "$bucket" --delete "$payload" >/dev/null
-    echo "destroy:   removed $count versions from $bucket"
-  done
+bucket = sys.argv[1]
+while True:
+    listed = subprocess.check_output(
+        ["aws", "s3api", "list-object-versions", "--bucket", bucket, "--max-items", "500", "--output", "json"]
+    )
+    found = json.loads(listed or b"{}")
+    objects = [
+        {"Key": entry["Key"], "VersionId": entry["VersionId"]}
+        for kind in ("Versions", "DeleteMarkers")
+        for entry in found.get(kind) or []
+    ]
+    if not objects:
+        break
+    subprocess.check_call(
+        ["aws", "s3api", "delete-objects", "--bucket", bucket, "--delete", json.dumps({"Objects": objects, "Quiet": True})],
+        stdout=subprocess.DEVNULL,
+    )
+    print(f"destroy:   removed {len(objects)} versions from {bucket}", file=sys.stderr)
+PY
 }
 
 # ------------------------------------------------------------------- confirm
 
-project=$(tf_console "$bootstrap_dir" 'local.project')
-state_bucket=$(tf_console "$bootstrap_dir" 'local.state_bucket_name')
-region=$(tf_console "$bootstrap_dir" 'var.platform.region')
-bootstrap_state_key=$(tf_console "$bootstrap_dir" 'var.bootstrap_state_key')
-site_state_key=$(tf_console "$bootstrap_dir" 'var.site_state_key')
+# The names come from the configuration, with a local backend, so that reading
+# them needs no state and no credentials.
+init_local "$bootstrap_stack"
+read_script_names "$bootstrap_stack"
+drop_override "$bootstrap_stack"
 
-cat <<EOF
-destroy: about to destroy $project in $environment ($region).
+configured=$(named environment)
+[ "$configured" = "$environment" ] ||
+  die "asked for $environment but infra/envs/$environment/platform.tfvars.json says $configured."
 
-This removes the site, the sign-up API, the Cognito pool, the account table and
-its key, then the pipeline's roles and the state bucket. It cannot be undone.
+project=$(named project)
+[ "${CONFIRM_PROJECT:-}" = "$project" ] ||
+  die "not confirmed: set CONFIRM_PROJECT to $project to destroy the $half half of $environment. Nothing done."
 
-EOF
-printf 'Type the project name (%s) to go on: ' "$project"
-read -r typed
-[ "$typed" = "$project" ] || {
-  echo "destroy: not confirmed; nothing done." >&2
-  exit 1
-}
+ACCOUNT_ID=$(account_id)
+state_bucket=$(state_bucket_name)
+region=$(named aws_region)
+bootstrap_state_key=$(named bootstrap_state_key)
+site_state_key=$(named site_state_key)
+
+note "$half half of $project in $environment ($region)"
 
 # ---------------------------------------------------------------- the site
 
-echo "destroy: the site stack"
-tf_site init -input=false -no-color -reconfigure \
-  -backend-config="bucket=$state_bucket" \
-  -backend-config="key=$site_state_key" \
-  -backend-config="region=$region" >/dev/null
+if [ "$half" = site ]; then
+  # Terraform reads the function package while planning the destroy, so it has
+  # to be there. Read with a local backend: no state, no lock, no credentials.
+  init_local "$site_stack"
+  package_dir=$(console_value "$site_stack" 'var.package_dir')
+  drop_override "$site_stack"
 
-# Terraform reads the function package while planning the destroy, so it has to
-# be there.
-package_dir=$(tf_console "$site_dir" 'var.package_dir')
-if [ ! -d "$site_dir/$package_dir" ]; then
-  echo "destroy: build the function package first: python tools/build_api.py --out build/api" >&2
-  exit 1
+  [ -d "$site_stack/$package_dir" ] ||
+    die "build the function package first: python tools/build_api.py --out build/api"
+
+  terraform -chdir="$site_stack" init -input=false -no-color -reconfigure \
+    -backend-config="bucket=$state_bucket" \
+    -backend-config="key=$site_state_key" \
+    -backend-config="region=$region" >/dev/null
+
+  # The account table and the sign-in pool are protected against deletion, and
+  # the site bucket is versioned, so the protection comes off and the bucket is
+  # made emptiable first, by Terraform. The destroy runs with the same values
+  # so that it does not try to put them back.
+  site_vars=(
+    -var-file="$PLATFORM_VARS"
+    -var="assume_service_roles=${ASSUME_SERVICE_ROLES:-false}"
+    -var="table_deletion_protection=false"
+    -var="user_pool_deletion_protection=INACTIVE"
+    -var="web_bucket_force_destroy=true"
+  )
+
+  if terraform -chdir="$site_stack" state list 2>/dev/null | grep -q .; then
+    note "taking the deletion protection off the table and the pool"
+    terraform -chdir="$site_stack" apply -input=false -no-color -auto-approve "${site_vars[@]}" \
+      -target=module.account.aws_dynamodb_table.this \
+      -target=module.account.aws_cognito_user_pool.this
+  fi
+
+  note "destroying the site stack"
+  terraform -chdir="$site_stack" destroy -input=false -no-color -auto-approve "${site_vars[@]}"
+
+  cat <<EOF
+
+destroy: the site is gone. The state bucket and the pipeline's roles are not:
+run this again with "bootstrap" to take those down.
+EOF
+  exit 0
 fi
-
-web_bucket=$(tf_site output -raw bucket_name 2>/dev/null || true)
-if [ -n "$web_bucket" ]; then
-  empty_bucket "$web_bucket"
-fi
-
-# assume_service_roles stays false: this runs as an administrator, not as the
-# pipeline, and the service roles are about to stop existing.
-tf_site destroy -input=false -no-color -auto-approve \
-  -var-file="$platform_vars" -var="assume_service_roles=false"
 
 # ----------------------------------------------------------- the footing
 
-echo "destroy: the bootstrap stack"
+# Its own state lives in the bucket it is about to delete, so the state comes
+# back to a local file first.
+note "bringing the bootstrap state back to a local file"
+terraform -chdir="$bootstrap_stack" init -input=false -no-color -reconfigure \
+  -backend-config="bucket=$state_bucket" \
+  -backend-config="key=$bootstrap_state_key" \
+  -backend-config="region=$region" >/dev/null
 
-# Its state lives in the bucket it is about to delete, so bring the state back
-# to a local file first.
-printf 'terraform {\n  backend "local" {}\n}\n' >"$override_file"
-tf_bootstrap init -input=false -no-color -force-copy -migrate-state >/dev/null
+write_override "$bootstrap_stack"
+terraform -chdir="$bootstrap_stack" init -input=false -no-color -force-copy -migrate-state >/dev/null
 
-# The state bucket carries prevent_destroy, so it leaves Terraform's hands
-# before the destroy and is deleted directly afterwards.
+# The state bucket carries prevent_destroy, which takes no variable, so it
+# leaves Terraform's hands before the destroy and is emptied and deleted
+# afterwards. Everything else - the roles, their policies and the ceiling - is
+# destroyed by Terraform. The GitHub sign-in provider is the seed's and is only
+# read by this stack, so a destroy does not touch it.
 while IFS= read -r address; do
-  tf_bootstrap state rm "$address" >/dev/null
-done < <(tf_bootstrap state list | grep -E '^aws_s3_bucket[a-z_]*\.state$' || true)
+  note "taking $address out of state"
+  terraform -chdir="$bootstrap_stack" state rm "$address" >/dev/null
+done < <(terraform -chdir="$bootstrap_stack" state list | grep -E '^aws_s3_bucket[a-z_]*\.state$' || true)
 
-tf_bootstrap destroy -input=false -no-color -auto-approve -var-file="$platform_vars"
+destroy_vars=(-var-file="$PLATFORM_VARS")
+if [ -n "${GITHUB_SUBJECT_PREFIX:-}" ]; then
+  destroy_vars+=(-var "github_subject_prefix=$GITHUB_SUBJECT_PREFIX")
+fi
 
+note "destroying the pipeline's roles"
+terraform -chdir="$bootstrap_stack" destroy -input=false -no-color -auto-approve "${destroy_vars[@]}"
+
+note "emptying and deleting $state_bucket"
 empty_bucket "$state_bucket"
-aws s3api delete-bucket --bucket "$state_bucket" --region "$region" >/dev/null 2>&1 || true
+aws s3api delete-bucket --bucket "$state_bucket" --region "$region" >/dev/null
 
-rm -f "$override_file" "$bootstrap_dir/terraform.tfstate" "$bootstrap_dir/terraform.tfstate.backup"
+drop_override "$bootstrap_stack"
+rm -f "$bootstrap_stack/terraform.tfstate" "$bootstrap_stack/terraform.tfstate.backup"
 
 cat <<EOF
 
-destroy: done. $state_bucket and $bootstrap_state_key are gone.
+destroy: done. $state_bucket and the pipeline's roles are gone.
 
-The GitHub environments and their variables are left alone: they hold no
-secret, and the next scripts/bootstrap.sh $environment overwrites them.
+The seed is untouched: GitHub's sign-in to the account, the bootstrap role, and
+the GitHub environments and their two repository variables. Run the Bootstrap
+workflow to build it all again.
 EOF

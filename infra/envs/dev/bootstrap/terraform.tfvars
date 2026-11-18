@@ -11,20 +11,45 @@
 # The read sets are deliberately complete rather than minimal: the AWS provider
 # reads the whole of a resource on every refresh, and a missing read action
 # costs a failed pipeline run.
+#
+# The Destroy workflow runs as these same roles, not as an administrator, so
+# each one can delete and unprotect what it creates as well as create it.
 
 github_owner      = "Danny-Cooke"
 github_repository = "draftsman-customer-site"
 
-# Two GitHub environments: a pull request can only reach the read-only plan
-# role, and only a deploy from main can reach the role that may assume the
-# service roles.
+# Three GitHub environments: a pull request can only reach the read-only plan
+# role, only a deploy from main can reach the role that may assume the service
+# roles, and only the bootstrap environment - which needs a reviewer's approval
+# - can reach the seed's bootstrap role, which is the only role that may change
+# this stack.
 github_environments = {
-  plan   = "dev-plan"
-  deploy = "dev"
+  bootstrap = "dev-bootstrap"
+  plan      = "dev-plan"
+  deploy    = "dev"
 }
 
-# This account had no GitHub sign-in provider when this was written.
+# ------------------------------------------------------------------- the seed
+#
+# Read by scripts/seed.sh and given to infra/seed/seed.yaml. Nothing in this
+# stack uses them: the seed is CloudFormation, so that it needs no Terraform
+# state, and these are declared here so that they are declared once.
+
+# This account had no GitHub sign-in provider when this was written. False
+# makes the seed read the existing one instead of creating it; an account can
+# hold only one per issuer.
 create_oidc_provider = true
+
+# GitHub's published thumbprints for token.actions.githubusercontent.com. IAM
+# validates this issuer against its own trust store and ignores them, and the
+# resource still takes the list.
+github_oidc_thumbprints = [
+  "6938fd4d98bab03faadb97b34396831e3780aea1",
+  "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
+]
+
+# The seed is the one thing not made by Terraform.
+seed_managed_by = "cloudformation"
 
 site_state_key      = "site/terraform.tfstate"
 bootstrap_state_key = "bootstrap/terraform.tfstate"
@@ -38,7 +63,7 @@ publish_service = "publish"
 service_roles = {
   # ------------------------------------------------------------------ storage
   storage = {
-    description = "Creates and configures the site bucket. No object actions: publishing is a different role."
+    description = "Creates and configures the site bucket, and empties it when the site is destroyed. Publishing is a different role."
     statements = {
       web_bucket = {
         resources = ["web_bucket"]
@@ -78,6 +103,17 @@ service_roles = {
           "s3:PutBucketVersioning",
           "s3:PutEncryptionConfiguration",
           "s3:PutLifecycleConfiguration",
+        ]
+      }
+      # Nothing but deletes, and only to empty the bucket on a destroy, which
+      # Terraform does itself when web_bucket_force_destroy is set. It cannot
+      # read or write a site file: that is the publish role's work.
+      web_bucket_objects = {
+        resources    = ["web_bucket_objects"]
+        read_actions = []
+        write_actions = [
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion",
         ]
       }
     }
@@ -379,6 +415,7 @@ service_roles = {
         write_actions = [
           "logs:CreateLogDelivery",
           "logs:DeleteLogDelivery",
+          "logs:DeleteResourcePolicy",
           "logs:PutResourcePolicy",
           "logs:UpdateLogDelivery",
         ]

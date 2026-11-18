@@ -14,11 +14,12 @@ variable "project_suffix" {
 }
 
 variable "platform" {
-  description = "The naming slots and Regions every module shares. No project slot: it is derived from product_name and project_suffix."
+  description = "The naming slots, the partition and the Regions every module shares. No project slot: it is derived from product_name and project_suffix. The partition is declared rather than looked up, so that a script can compose an ARN from the configuration alone, with no AWS call and no credentials."
   type = object({
     prefix      = string
     environment = string
     postfix     = string
+    partition   = string
     region      = string
     edge_region = string
   })

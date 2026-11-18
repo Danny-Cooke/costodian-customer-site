@@ -35,9 +35,10 @@ tools/build.py           renders the pages into dist/
 tools/smoke.py           checks a deployed copy
 tools/sync_rules.py      refreshes site/data from the product's rule register
 tests/                   build tests (pytest) and browser-side tests (node + jsdom)
-infra/modules/           naming, web
+infra/modules/           naming, web, account
+infra/seed/              seed.yaml: the CloudFormation seed, the one thing applied by hand
 infra/envs/dev/          platform.tfvars.json, the bootstrap stack and the site stack
-scripts/                 bootstrap.sh and destroy.sh: the only things run by hand
+scripts/                 seed.sh (by hand), names.sh, bootstrap.sh, destroy.sh (workflows)
 runbooks/                bootstrap and deploy
 ```
 
@@ -52,8 +53,10 @@ runbooks/                bootstrap and deploy
 - **Infrastructure values are in tfvars.** `infra/envs/dev/platform.tfvars.json` holds
   the naming slots and Regions shared by both stacks; each stack has its own
   `terraform.tfvars`. Every resource name is composed by `infra/modules/naming`.
-- **Deployment values are GitHub environment variables** (role, Region, state
-  bucket and key), listed at the top of `.github/workflows/site.yml`.
+- **Deployment values are worked out from the tfvars at run time** by
+  `scripts/names.sh`: the roles, Region, state bucket, state keys and
+  environment names. GitHub holds two repository variables, both set by
+  `scripts/seed.sh`: `AWS_ACCOUNT_ID` and `OIDC_SUBJECT_PREFIX`.
 - **Site values can be overridden at deploy** without a commit, from GitHub
   variables: price, refund period, contact address and the preview banner.
 
@@ -189,8 +192,10 @@ own details); `FIRM#<id>` holds `firm`, `company`, the agreement acceptance, one
 - Two-step sign-in is off for the sign-up portal. The site says every user of the
   product signs in with two steps.
 - Finishing set-up does nothing yet: nobody is told and no account is requested.
-- `scripts/destroy.sh` has never been run, and needs `jq`, which the bootstrap
-  script does not.
+- No workflow or script here has been run since they were rewritten to run in
+  GitHub: the account is empty of this project. `infra/seed/seed.yaml` has never
+  been applied, so the bootstrap role's permissions are reasoned, not proven,
+  and CloudFormation has not parsed the template.
 - Verification emails come from the sign-in service's shared sender, which is
   limited to a small number a day and is not branded.
 
@@ -241,18 +246,28 @@ profile, or if a model with a retention period were chosen.
 
 ## How it is deployed
 
-Nothing is applied by hand except `scripts/bootstrap.sh <environment>`, once, by a
-person with an administrator profile. It creates the Terraform state bucket (in the
-same account), GitHub's sign-in to AWS (OIDC; no keys are stored anywhere) and the
-pipeline's roles, and writes their names into the GitHub environments.
+Everything runs in GitHub Actions. The only thing applied from a person's
+machine is the seed, `scripts/seed.sh <environment>`, once per environment: a
+CloudFormation stack holding GitHub's sign-in to AWS (OIDC; no keys are stored
+anywhere) and one role, the bootstrap role, which GitHub may assume from one
+environment of this repository and which may do nothing but apply and destroy
+the Terraform bootstrap stack. It also sets the two repository variables a
+workflow cannot work out for itself: `AWS_ACCOUNT_ID` and
+`OIDC_SUBJECT_PREFIX`.
 
-After that, `.github/workflows/site.yml` does everything:
+After that there are three workflows and nothing by hand:
 
-| When | Job | Signs in as | Does |
+| Workflow | When | Signs in as | Does |
 |---|---|---|---|
-| Every push and pull request | Tests | nobody | lint, both test suites, both builds, Terraform format and validate |
-| A pull request | Terraform plan | the read-only plan role | plans the site stack and shows what would change |
-| A merge to `main` | Deploy | the deploy role | applies Terraform, builds the site with the stack's outputs, publishes it, clears the cache, smoke tests the live address |
+| `bootstrap.yml` | by hand, with an approval | the bootstrap role | the Terraform state bucket and the pipeline's roles |
+| `site.yml` | every push and pull request | nobody | lint, both test suites, both builds, Terraform format and validate |
+| | a pull request | the read-only plan role | plans the site stack and shows what would change |
+| | a merge to `main` | the deploy role | applies Terraform, builds the site with the stack's outputs, publishes it, clears the cache, smoke tests the live address |
+| `destroy.yml` | by hand, project name typed | the deploy role, then the bootstrap role | takes the site down, then the roles and the state bucket. The seed survives |
+
+Every role ARN, bucket, state key and environment name is worked out at run time
+by `scripts/names.sh` from the tfvars, so none of them is typed into a workflow
+or kept in a GitHub variable where it could drift.
 
 The deploy role can do nothing but read and write the state and assume one role per
 service (storage, keys, edge, identity, data, compute, access). Each Terraform provider
@@ -261,8 +276,8 @@ functions must carry a permissions boundary. Publishing the pages uses an eighth
 that can only write the site's files and clear the cache.
 
 A missing permission shows up as a failed deploy naming the action. Add it to
-`service_roles` in `infra/envs/dev/bootstrap/terraform.tfvars`, run the bootstrap
-script again, and re-run the pipeline.
+`service_roles` in `infra/envs/dev/bootstrap/terraform.tfvars`, run the
+`Bootstrap` workflow again, and re-run the pipeline.
 
 ## Known exceptions
 
