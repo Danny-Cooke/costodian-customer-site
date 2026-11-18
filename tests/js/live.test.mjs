@@ -24,6 +24,20 @@ const FIRM = {
 };
 const SIGNUP = { values: { ...YOU, ...FIRM }, completedAt: "2026-11-18T10:00:00.000Z" };
 const TOKENS = { AuthenticationResult: { IdToken: "token-1", RefreshToken: "refresh-1", ExpiresIn: 3600 } };
+const OWNER = { sub: "sub-owner", email: YOU.person_email, role: "owner", addedBy: YOU.person_email, addedAt: "2026-11-18T10:00:00.000Z" };
+const ADMIN = { sub: "sub-admin", email: "alex@example.test", role: "admin", addedBy: YOU.person_email, addedAt: "2026-11-18T11:00:00.000Z" };
+// What the API answers for a person in a firm; `more` replaces any part of it.
+const accountOf = (member, more = {}) => ({
+  body: {
+    member: member && { role: member.role, sub: member.sub },
+    signup: SIGNUP,
+    company: null,
+    agreement: null,
+    people: [OWNER, ADMIN],
+    changes: [],
+    ...more,
+  },
+});
 const data = liveData();
 const fill = (page, values) => Object.entries(values).forEach(([id, value]) => page.set(id, value));
 const visibleStep = (page) => page.all("[data-step]").filter((step) => !step.hidden).map((step) => step.dataset.step);
@@ -61,6 +75,8 @@ test("signing up creates the sign-in, confirms the code, signs in and saves the 
     SignUp: () => ({ body: { UserConfirmed: false } }),
     ConfirmSignUp: () => ({ body: {} }),
     InitiateAuth: () => ({ body: TOKENS }),
+    [`POST ${data.api.firm}`]: () => ({ body: { member: { role: "owner" } } }),
+    [`GET ${data.api.account}`]: () => accountOf(OWNER, { signup: null }),
     [`PUT ${data.api.account}/signup`]: (request) => ({ body: { signup: { ...request.body, completedAt: SIGNUP.completedAt } } }),
   });
   const page = await openLive("signup", storage, net);
@@ -91,7 +107,7 @@ test("signing up creates the sign-in, confirms the code, signs in and saves the 
   await settle();
   assert.deepEqual(
     net.requests.map((request) => request.target || `${request.method} ${request.url}`),
-    ["SignUp", "ConfirmSignUp", "InitiateAuth", `PUT ${data.api.account}/signup`],
+    ["SignUp", "ConfirmSignUp", "InitiateAuth", `POST ${data.api.firm}`, `GET ${data.api.account}`, `PUT ${data.api.account}/signup`],
   );
   const save = net.requests.at(-1);
   assert.equal(save.headers.Authorization, "token-1");
@@ -150,14 +166,14 @@ test("a portal page sends a visitor who is not signed in to sign in, without cal
 });
 
 test("a signed-in person whose details were never saved is asked for them first", async () => {
-  const net = network({ [`GET ${data.api.account}`]: () => ({ body: { signup: null, company: null, agreement: null } }) });
+  const net = network({ [`GET ${data.api.account}`]: () => accountOf(OWNER, { signup: null }) });
   const page = await openLive("company", sessionWith(memoryStorage()), net);
   assert.deepEqual(page.visited, [routes.details]);
 });
 
 test("my account shows who is signed in and what is done, read from the API", async () => {
   const net = network({
-    [`GET ${data.api.account}`]: () => ({ body: { signup: SIGNUP, company: { savedAt: "2026-11-18T11:00:00.000Z" }, agreement: null } }),
+    [`GET ${data.api.account}`]: () => accountOf(OWNER, { company: { savedAt: "2026-11-18T11:00:00.000Z" } }),
   });
   const page = await openLive("portal", sessionWith(memoryStorage()), net);
   assert.deepEqual(page.visited, []);
@@ -171,7 +187,7 @@ test("my account shows who is signed in and what is done, read from the API", as
 
 test("your details are filled from the account and saved back to it", async () => {
   const net = network({
-    [`GET ${data.api.account}`]: () => ({ body: { signup: SIGNUP, company: null, agreement: null } }),
+    [`GET ${data.api.account}`]: () => accountOf(OWNER),
     [`PUT ${data.api.account}/signup`]: (request) => ({ body: { signup: { ...request.body, completedAt: SIGNUP.completedAt } } }),
   });
   const page = await openLive("details", sessionWith(memoryStorage()), net);
@@ -186,7 +202,7 @@ test("your details are filled from the account and saved back to it", async () =
 
 test("what the API refuses is shown, and the page does not claim it was saved", async () => {
   const net = network({
-    [`GET ${data.api.account}`]: () => ({ body: { signup: SIGNUP, company: null, agreement: null } }),
+    [`GET ${data.api.account}`]: () => accountOf(OWNER),
     [`PUT ${data.api.account}/signup`]: () => ({ status: 422, body: { errors: { firm_name: "Enter firm name" } } }),
   });
   const page = await openLive("details", sessionWith(memoryStorage()), net);
@@ -202,7 +218,7 @@ test("a token about to run out is renewed before the API is called", async () =>
       assert.equal(request.body.AuthFlow, "REFRESH_TOKEN_AUTH");
       return { body: { AuthenticationResult: { IdToken: "token-2", ExpiresIn: 3600 } } };
     },
-    [`GET ${data.api.account}`]: () => ({ body: { signup: SIGNUP, company: null, agreement: null } }),
+    [`GET ${data.api.account}`]: () => accountOf(OWNER),
   });
   await openLive("portal", sessionWith(memoryStorage(), "token-1", 5), net);
   assert.deepEqual(net.requests.map((request) => request.target || request.url), ["InitiateAuth", data.api.account]);
@@ -252,7 +268,7 @@ test("signing in before the email address is confirmed asks for the code", async
 test("signing out forgets the session and ends it at the sign-in service", async () => {
   const storage = sessionWith(memoryStorage());
   const net = network({
-    [`GET ${data.api.account}`]: () => ({ body: { signup: SIGNUP, company: null, agreement: null } }),
+    [`GET ${data.api.account}`]: () => accountOf(OWNER),
     RevokeToken: () => ({ body: {} }),
   });
   const page = await openLive("portal", storage, net);
@@ -261,4 +277,127 @@ test("signing out forgets the session and ends it at the sign-in service", async
   assert.equal(storage.getItem(data.auth.sessionKey), null);
   assert.equal(net.requests.at(-1).target, "RevokeToken");
   assert.deepEqual(page.visited, [routes.home]);
+});
+
+// ------------------------------------------------------- firms, roles, people
+
+const personRows = (page) => page.all("[data-people] [data-person]");
+const shown = (elements) => elements.filter((element) => !element.hidden);
+
+test("a signed-in person with no firm is given one before anything else", async () => {
+  let enrolled = false;
+  const net = network({
+    [`GET ${data.api.account}`]: () => (enrolled ? accountOf(OWNER, { signup: null }) : accountOf(null, { signup: null, people: [] })),
+    [`POST ${data.api.firm}`]: () => {
+      enrolled = true;
+      return { body: { member: { role: "owner" } } };
+    },
+  });
+  const page = await openLive("details", sessionWith(memoryStorage()), net);
+  assert.deepEqual(
+    net.requests.map((request) => `${request.method} ${request.url}`),
+    [`GET ${data.api.account}`, `POST ${data.api.firm}`, `GET ${data.api.account}`],
+  );
+  assert.deepEqual(page.visited, []);
+});
+
+test("an owner sees everyone, can invite, change a role and remove a person", async () => {
+  const net = network({
+    [`GET ${data.api.account}`]: () => accountOf(OWNER),
+    [`POST ${data.api.people}`]: (request) => ({
+      body: {
+        people: [OWNER, ADMIN, { sub: "sub-new", email: request.body.values.invite_email, role: request.body.values.invite_role }],
+        changes: [{ at: "2026-11-18T12:00:00.000Z", by: OWNER.email, what: "invited", subject: request.body.values.invite_email, role: "admin" }],
+      },
+    }),
+    [`PUT ${data.api.people}/${ADMIN.sub}`]: () => ({ body: { people: [OWNER, { ...ADMIN, role: "owner" }], changes: [] } }),
+    [`DELETE ${data.api.people}/${ADMIN.sub}`]: () => ({ body: { people: [OWNER], changes: [] } }),
+  });
+  const page = await openLive("people", sessionWith(memoryStorage()), net);
+  assert.deepEqual(personRows(page).map((row) => row.querySelector("[data-person-email]").textContent), [OWNER.email, ADMIN.email]);
+  assert.equal(page.one(`[data-person="${OWNER.sub}"] [data-person-you]`).hidden, false);
+  assert.equal(page.one("[data-invite]").hidden, false);
+  const adminRow = () => page.one(`[data-person="${ADMIN.sub}"]`);
+  assert.deepEqual(shown([...adminRow().querySelectorAll("[data-make]")]).map((button) => button.dataset.make), ["owner"]);
+  assert.equal(page.one('[data-input="invite_role"]:checked').value, "admin", "an invitation is for the lower role unless chosen otherwise");
+
+  page.set("invite_email", "not-an-address");
+  page.submit();
+  assert.match(page.error("invite_email"), /name@example\.com/);
+
+  page.set("invite_email", "jo@example.test");
+  page.submit();
+  await settle();
+  assert.deepEqual(net.requests.at(-1).body, { values: { invite_email: "jo@example.test", invite_role: "admin" } });
+  assert.equal(personRows(page).length, 3);
+  assert.equal(page.one("[data-notice]").hidden, false);
+  assert.match(page.one("[data-changes]").textContent, /invited jo@example\.test as administrator/);
+
+  page.click(adminRow().querySelector('[data-make="owner"]'));
+  await settle();
+  assert.deepEqual([net.requests.at(-1).method, net.requests.at(-1).body], ["PUT", { role: "owner" }]);
+  assert.equal(adminRow().querySelector("[data-person-role]").textContent, "Owner");
+
+  page.click(adminRow().querySelector("[data-remove]"));
+  await settle();
+  assert.equal(net.requests.at(-1).method, "DELETE");
+  assert.equal(personRows(page).length, 1);
+});
+
+test("an administrator sees the people but cannot invite, change or remove anyone", async () => {
+  const net = network({ [`GET ${data.api.account}`]: () => accountOf(ADMIN) });
+  const page = await openLive("people", sessionWith(memoryStorage()), net);
+  assert.equal(personRows(page).length, 2);
+  assert.equal(page.one("[data-invite]").hidden, true);
+  assert.ok(page.all("[data-person-manage]").every((controls) => controls.hidden));
+});
+
+test("what the API refuses about a person is shown and the list is left as it was", async () => {
+  const net = network({
+    [`GET ${data.api.account}`]: () => accountOf(OWNER, { people: [OWNER] }),
+    [`DELETE ${data.api.people}/${OWNER.sub}`]: () => ({ status: 409, body: { error: "last_owner", problems: ["A firm's account must always have at least one owner."] } }),
+  });
+  const page = await openLive("people", sessionWith(memoryStorage()), net);
+  page.click(page.one("[data-remove]"));
+  await settle();
+  assert.match(page.one("[data-invite] [data-summary]").textContent, /at least one owner/);
+  assert.equal(personRows(page).length, 1);
+});
+
+test("only an owner is offered the agreement to accept", async () => {
+  const asAdmin = await openLive("agreements", sessionWith(memoryStorage()), network({ [`GET ${data.api.account}`]: () => accountOf(ADMIN) }));
+  assert.equal(asAdmin.one("[data-form]").hidden, true);
+  assert.equal(asAdmin.one("[data-owner-only]").hidden, false);
+
+  const asOwner = await openLive("agreements", sessionWith(memoryStorage()), network({ [`GET ${data.api.account}`]: () => accountOf(OWNER) }));
+  assert.equal(asOwner.one("[data-form]").hidden, false);
+  assert.equal(asOwner.one("[data-owner-only]").hidden, true);
+});
+
+test("an invited person signs in with the temporary password and chooses their own", async () => {
+  const storage = memoryStorage();
+  const net = network({
+    InitiateAuth: () => ({ body: { ChallengeName: "NEW_PASSWORD_REQUIRED", Session: "session-1" } }),
+    RespondToAuthChallenge: () => ({ body: TOKENS }),
+  });
+  const page = await openLive("signin", storage, net);
+  const form = page.one('[data-panel="signin"] form');
+  page.set("signin_email", ADMIN.email, form);
+  page.set("signin_password", "Temporary-1!", form);
+  page.submit(form);
+  await settle();
+  assert.equal(page.one('[data-panel="new-password"]').hidden, false);
+  assert.deepEqual(page.visited, [], "nobody is signed in on a temporary password");
+
+  const choose = page.one('[data-panel="new-password"] form');
+  page.set("new_password", PASSWORD, choose);
+  page.set("new_password_again", PASSWORD, choose);
+  page.submit(choose);
+  await settle();
+  const answer = net.requests.at(-1);
+  assert.equal(answer.target, "RespondToAuthChallenge");
+  assert.deepEqual(answer.body.ChallengeResponses, { USERNAME: ADMIN.email, NEW_PASSWORD: PASSWORD });
+  assert.equal(answer.body.Session, "session-1");
+  assert.deepEqual(page.visited, [routes.portal]);
+  assert.ok(!everythingStored(storage).includes(PASSWORD));
 });

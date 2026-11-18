@@ -9,7 +9,6 @@
     "too_small": "{label} must be {min} or more",
     "too_large": "{label} must be {max} or less",
     "summary_title": "There is a problem",
-    "fee_earner_required": "Add at least one fee earner",
     "funding_required": "Choose at least one type of funding",
     "too_short": "Use at least {min_length} characters",
     "mismatch": "The two entries do not match",
@@ -25,7 +24,15 @@
     "save_failed": "Your changes could not be saved. Try again.",
     "code_sent": "We have sent a code to your email address.",
     "reset_done": "Your password has been changed. Sign in with the new one.",
-    "too_many_rows": "There are too many fee earners"
+    "not_allowed": "Only an owner of the firm's account can do that.",
+    "last_owner": "A firm's account must always have at least one owner.",
+    "invite_exists": "That email address already has an account.",
+    "invite_sent": "The invitation has been sent.",
+    "member_removed": "That person can no longer manage the firm's account.",
+    "role_changed": "The role has been changed.",
+    "too_many_members": "There are too many people on this account.",
+    "no_firm": "Your sign-in is not attached to a firm's account.",
+    "auth_new_password": "Choose your own password to finish signing in."
   },
   "formats": {
     "email": {
@@ -163,7 +170,8 @@
             "help": "Optional. Only if you are a solicitor."
           }
         ],
-        "profile": true
+        "profile": true,
+        "scope": "person"
       },
       {
         "id": "firm",
@@ -267,7 +275,8 @@
             "help": "Optional."
           }
         ],
-        "profile": true
+        "profile": true,
+        "scope": "firm"
       },
       {
         "id": "signin",
@@ -421,81 +430,6 @@
           "type": "checkbox",
           "required": false,
           "default": false
-        }
-      ]
-    },
-    "fee_earners": {
-      "title": "Fee earners",
-      "intro": "The people whose work appears on bills. Rates are only needed for privately funded work; legal aid rates are set by the Legal Aid Agency.",
-      "add_label": "Add a fee earner",
-      "remove_label": "Remove",
-      "row_title": "Fee earner",
-      "fields": [
-        {
-          "id": "name",
-          "label": "name",
-          "type": "text",
-          "required": true,
-          "max_length": 120
-        },
-        {
-          "id": "initials",
-          "label": "initials",
-          "type": "text",
-          "required": true,
-          "max_length": 6
-        },
-        {
-          "id": "grade",
-          "label": "grade",
-          "type": "select",
-          "required": true,
-          "options": [
-            {
-              "value": "A",
-              "label": "Grade A (most senior)"
-            },
-            {
-              "value": "B",
-              "label": "Grade B"
-            },
-            {
-              "value": "C",
-              "label": "Grade C"
-            },
-            {
-              "value": "D",
-              "label": "Grade D (trainees and paralegals)"
-            }
-          ]
-        },
-        {
-          "id": "panel_member",
-          "label": "Member of a relevant accreditation panel",
-          "type": "checkbox",
-          "required": false,
-          "default": false
-        },
-        {
-          "id": "own_terms",
-          "label": "Manages their own rates and terms (consultant)",
-          "type": "checkbox",
-          "required": false,
-          "default": false,
-          "help": "Tick for a consultant who sets their own private-client rates. They fill these in themselves."
-        },
-        {
-          "id": "hourly_rate",
-          "label": "private hourly rate in pounds",
-          "type": "number",
-          "required": false,
-          "min": 0,
-          "max": 2000,
-          "help": "Optional. Leave blank to use the firm's rate for the grade.",
-          "show_if": {
-            "field": "own_terms",
-            "equals": false
-          }
         }
       ]
     },
@@ -755,6 +689,52 @@
         "required": true,
         "autocomplete": "new-password",
         "matches": "reset_password",
+        "max_length": 200
+      }
+    ]
+  },
+  "people": {
+    "invite": [
+      {
+        "id": "invite_email",
+        "label": "email address",
+        "type": "email",
+        "required": true,
+        "format": "email",
+        "autocomplete": "off",
+        "max_length": 200
+      },
+      {
+        "id": "invite_role",
+        "label": "role",
+        "type": "radio",
+        "required": true,
+        "options_key": "roles",
+        "default_key": "default_invite_role"
+      }
+    ]
+  },
+  "new_password": {
+    "fields": [
+      {
+        "type": "password",
+        "secret": true,
+        "required": true,
+        "min_length_key": "auth.password_min_length",
+        "max_length": 200,
+        "id": "new_password",
+        "label": "new password",
+        "autocomplete": "new-password",
+        "help": "Use upper and lower case letters, a number and a symbol."
+      },
+      {
+        "id": "new_password_again",
+        "label": "new password again",
+        "type": "password",
+        "secret": true,
+        "required": true,
+        "autocomplete": "new-password",
+        "matches": "new_password",
         "max_length": 200
       }
     ]

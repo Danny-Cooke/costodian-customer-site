@@ -18,8 +18,21 @@ from build import ROOT, load_forms, load_site, page_data
 
 API = ROOT / "api"
 CONFIG_NAME = "config.json"
-KEYS = {"account_prefix": "ACCOUNT#", "agreement_prefix": "agreement#"}
-SCRIPTS = ("signup", "company", "agreements")
+KEYS = {
+    "account_prefix": "ACCOUNT#",
+    "firm_prefix": "FIRM#",
+    "membership": "membership",
+    "person": "person",
+    "firm": "firm",
+    "company": "company",
+    "member_prefix": "member#",
+    "change_prefix": "change#",
+    "agreement_prefix": "agreement#",
+    "legacy_signup": "signup",
+}
+SCRIPTS = ("signup", "company", "agreements", "people")
+CONFIG_KEYS = {"agreements": "agreement"}
+PAGE_KEYS = ("steps", "sections", "fundingIds", "registerVersion", "fields", "agreement", "inviteFields")
 
 
 def api_config(site: dict[str, Any]) -> dict[str, Any]:
@@ -32,20 +45,10 @@ def api_config(site: dict[str, Any]) -> dict[str, Any]:
     }
     for script in SCRIPTS:
         data = page_data(by_script[script], site, forms)
-        config[script if script != "agreements" else "agreement"] = {
-            key: data[key]
-            for key in (
-                "steps",
-                "sections",
-                "feeEarners",
-                "fundingIds",
-                "maxFeeEarners",
-                "registerVersion",
-                "fields",
-                "agreement",
-            )
-            if key in data
-        }
+        config[CONFIG_KEYS.get(script, script)] = {key: data[key] for key in PAGE_KEYS if key in data}
+    config["roles"] = sorted(site["roles"])
+    config["permissions"] = site["permissions"]
+    config["firstMemberRole"] = site["first_member_role"]
     return config
 
 

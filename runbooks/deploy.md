@@ -25,11 +25,25 @@ gh workflow run site.yml --ref main
 
 ## Sign-up backend
 
-The sign-up API is three Lambda functions sharing one package. Terraform zips
-that package but does not build it, so the directory named by `package_dir` in
-`infra/envs/dev/site/terraform.tfvars` must exist before `terraform plan` or
-`apply` runs. From the repository root that is `build/api`, holding
-`handler.py`, `validation.py` and `config.json`. A missing directory fails the
+The sign-up API is five Lambda functions sharing one package, one per job:
+`read` reads the account record, `enrol` joins a person to a firm, `write`
+saves a section of company information, `accept` records the agreement, and
+`people` invites, changes and removes the firm's members. Each has its own role
+built from the exact table, key and user pool actions listed against it in
+`functions` in `infra/envs/dev/site/terraform.tfvars`: only `people` is allowed
+near the sign-in pool, and only it is given the pool's id. Changing what a
+function may do, or adding a function, is an edit to that map, deployed by the
+pipeline like any other commit. Changing the ceiling those roles carry
+(`function_boundary`) or what the pipeline's own roles may do (`service_roles`)
+is an edit to `infra/envs/dev/bootstrap/terraform.tfvars` and needs
+`scripts/bootstrap.sh dev` run by hand by a person with an administrator
+profile, before the pipeline runs: the pipeline cannot widen its own ceiling,
+which is the point of keeping it in a separate stack.
+
+Terraform zips that package but does not build it, so the directory named by
+`package_dir` in `infra/envs/dev/site/terraform.tfvars` must exist before
+`terraform plan` or `apply` runs. From the repository root that is `build/api`,
+holding `handler.py`, `validation.py` and `config.json`. A missing directory fails the
 plan, which is the intended behaviour: no plan should ever zip a stale package.
 `build/` is not committed.
 
@@ -58,6 +72,7 @@ The site stack gains these outputs, which the browser code needs:
 | `user_pool_client_id` | the app client; public by design, it has no secret |
 | `cognito_endpoint` | the regional Cognito address the browser calls |
 | `password_minimum_length` | the length the pool enforces, so the page can state it |
+| `invite_expiry_days` | how long an invited member's temporary password lasts |
 | `api_base_path` | the path the API is reached on, on the site's own address |
 | `account_table_name` | the table holding the account record |
 

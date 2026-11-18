@@ -35,6 +35,10 @@
     <button type="button" class="button quiet" data-show="signin">Back</button>
     {% endcall %}
 
+    {% call panel("new-password", "Choose your password", "You signed in with a temporary password. Choose your own to finish.", forms.new_password.fields, "Save and sign in") %}
+    <button type="button" class="button quiet" data-show="signin">Back</button>
+    {% endcall %}
+
     {% call panel("reset-request", "Reset your password", "Enter your email address and we will send you a code.", forms.reset.request.fields, "Send the code") %}
     <button type="button" class="button quiet" data-show="signin">Back</button>
     {% endcall %}

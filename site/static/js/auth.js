@@ -8,6 +8,7 @@ const SERVICE = "AWSCognitoIdentityProviderService";
 const CONTENT_TYPE = "application/x-amz-json-1.1";
 const PASSWORD_FLOW = "USER_PASSWORD_AUTH";
 const REFRESH_FLOW = "REFRESH_TOKEN_AUTH";
+const NEW_PASSWORD_CHALLENGE = "NEW_PASSWORD_REQUIRED";
 
 // What the service calls each failure, and the message key shown for it.
 const MESSAGE_KEYS = {
@@ -104,6 +105,25 @@ export function createAuth(data, { fetcher = globalThis.fetch, storage, clock = 
         ClientId: settings.clientId,
         AuthFlow: PASSWORD_FLOW,
         AuthParameters: { USERNAME: email, PASSWORD: password },
+      });
+      if (answer.ChallengeName === NEW_PASSWORD_CHALLENGE) {
+        // An invited person signing in with the temporary password: they choose
+        // their own before anything else. The caller finishes with newPassword().
+        const error = new AuthError(NEW_PASSWORD_CHALLENGE, "auth_new_password");
+        error.newPasswordNeeded = true;
+        error.session = answer.Session;
+        throw error;
+      }
+      if (!answer.AuthenticationResult) throw new AuthError("ChallengeNotSupported", FALLBACK_KEY);
+      keep(answer.AuthenticationResult);
+    },
+
+    async newPassword(email, password, session) {
+      const answer = await call("RespondToAuthChallenge", {
+        ClientId: settings.clientId,
+        ChallengeName: NEW_PASSWORD_CHALLENGE,
+        Session: session,
+        ChallengeResponses: { USERNAME: email, NEW_PASSWORD: password },
       });
       if (!answer.AuthenticationResult) throw new AuthError("ChallengeNotSupported", FALLBACK_KEY);
       keep(answer.AuthenticationResult);

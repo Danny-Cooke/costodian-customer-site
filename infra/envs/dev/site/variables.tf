@@ -162,6 +162,32 @@ variable "password_require_symbols" {
   type        = bool
 }
 
+variable "temporary_password_validity_days" {
+  description = "Days an invited member's temporary password stays usable. The invitation email states the same number, from this one value."
+  type        = number
+}
+
+variable "invite_message_template" {
+  description = "Subject and body of the email an invited member is sent, with placeholders. The product's name, the site's address and the temporary password's lifetime are put in by the account module; Cognito's own user name and one-time code placeholders are left alone."
+  type = object({
+    subject = string
+    message = string
+  })
+}
+
+variable "verification_message_template" {
+  description = "Subject and body of the email that confirms the address of a person who signs the firm up themselves."
+  type = object({
+    subject = string
+    message = string
+  })
+}
+
+variable "required_message_placeholders" {
+  description = "The placeholders Cognito itself requires in each message, by template key."
+  type        = map(list(string))
+}
+
 variable "mfa_configuration" {
   description = "OFF, ON or OPTIONAL for the user pool."
   type        = string
@@ -196,12 +222,13 @@ variable "token_validity_units" {
 }
 
 variable "functions" {
-  description = "The sign-up functions: handler, routes, and the exact table and key actions each one's own role is built from."
+  description = "The sign-up functions: handler, routes, and the exact table, key and user pool actions each one's own role is built from."
   type = map(object({
     handler       = string
     routes        = list(string)
     table_actions = list(string)
     key_actions   = list(string)
+    pool_actions  = list(string)
   }))
 }
 

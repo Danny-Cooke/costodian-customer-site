@@ -507,7 +507,8 @@ access_protected_write_actions = [
 ]
 
 # The ceiling on a sign-up function: the account table, the account key through
-# DynamoDB, and its own log stream. Nothing a function is given can exceed it.
+# DynamoDB, its own log stream, and the three calls that manage a firm's members
+# in the sign-in pool. Nothing a function is given can exceed it.
 function_boundary = {
   dynamodb_actions = [
     "dynamodb:BatchGetItem",
@@ -527,5 +528,12 @@ function_boundary = {
   logs_actions = [
     "logs:CreateLogStream",
     "logs:PutLogEvents",
+  ]
+  # Adding a member, removing one, and ending a removed member's sessions.
+  # Nothing that reads the directory or changes the pool's own settings.
+  cognito_actions = [
+    "cognito-idp:AdminCreateUser",
+    "cognito-idp:AdminDeleteUser",
+    "cognito-idp:AdminUserGlobalSignOut",
   ]
 }
