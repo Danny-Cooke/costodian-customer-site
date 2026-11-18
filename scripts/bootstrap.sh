@@ -90,7 +90,8 @@ trap cleanup EXIT
 # The state bucket may not exist yet, so the first init keeps state locally.
 # backend_override.tf is git-ignored.
 printf 'terraform {\n  backend "local" {}\n}\n' >"$override_file"
-tf init -input=false -no-color >/dev/null
+# -reconfigure: an earlier run leaves this folder pointed at the bucket.
+tf init -input=false -no-color -reconfigure >/dev/null
 
 configured_environment=$(tf_console 'var.platform.environment')
 if [ "$configured_environment" != "$environment" ]; then
@@ -107,7 +108,14 @@ local_state="$stack_dir/terraform.tfstate"
 region=$(tf_console 'var.platform.region')
 state_key=$(tf_console 'var.bootstrap_state_key')
 
+# GitHub decides how a repository is named in the tokens it issues; the roles
+# must trust exactly that, so it is asked rather than assumed.
+repository_path=$(tf_console 'local.repository_path')
+subject_prefix=$(gh api "repos/$repository_path/actions/oidc/customization/sub" --jq '.sub_claim_prefix // ""' 2>/dev/null || true)
+apply_vars=(-var-file="$platform_vars" -var "github_subject_prefix=$subject_prefix")
+
 echo "bootstrap: $environment, state bucket $bucket in $region"
+echo "bootstrap: GitHub subject ${subject_prefix:-repo:$repository_path}"
 
 backend_config=(
   -backend-config="bucket=$bucket"
@@ -123,10 +131,10 @@ if [ ! -s "$local_state" ] && aws s3api head-bucket --bucket "$bucket" >/dev/nul
   echo "bootstrap: state bucket exists; working against it"
   rm -f "$override_file"
   tf init -input=false -no-color -reconfigure "${backend_config[@]}" >/dev/null
-  tf apply -input=false -no-color -auto-approve -var-file="$platform_vars"
+  tf apply -input=false -no-color -auto-approve "${apply_vars[@]}"
 else
   echo "bootstrap: first run; applying with local state, then moving it into the bucket"
-  tf apply -input=false -no-color -auto-approve -var-file="$platform_vars"
+  tf apply -input=false -no-color -auto-approve "${apply_vars[@]}"
   made=$(tf output -raw state_bucket)
   if [ "$made" != "$bucket" ]; then
     echo "bootstrap: expected the state bucket to be $bucket but Terraform made $made. The state is still in $local_state." >&2

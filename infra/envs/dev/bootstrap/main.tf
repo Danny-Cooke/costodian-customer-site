@@ -73,9 +73,15 @@ locals {
   oidc_provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn
   repository_path   = "${var.github_owner}/${var.github_repository}"
 
+  # How GitHub names this repository in the tokens it issues. A repository set
+  # to immutable subjects is named by owner and repository id as well as by
+  # name, so a rename cannot hand its roles to another repository. The
+  # bootstrap script reads the prefix from GitHub and passes it in.
+  subject_prefix = var.github_subject_prefix != "" ? var.github_subject_prefix : "repo:${local.repository_path}"
+
   subjects = {
-    plan   = "repo:${local.repository_path}:environment:${var.github_environments.plan}"
-    deploy = "repo:${local.repository_path}:environment:${var.github_environments.deploy}"
+    plan   = "${local.subject_prefix}:environment:${var.github_environments.plan}"
+    deploy = "${local.subject_prefix}:environment:${var.github_environments.deploy}"
   }
 
   # Everything each component creates carries its own prefix.

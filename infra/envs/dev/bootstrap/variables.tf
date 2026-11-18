@@ -118,3 +118,9 @@ variable "function_boundary" {
     logs_actions     = list(string)
   })
 }
+
+variable "github_subject_prefix" {
+  description = "The start of the subject GitHub puts in this repository's tokens, as GitHub reports it (repos/<owner>/<repo>/actions/oidc/customization/sub). Empty uses the plain repo:<owner>/<repository> form."
+  type        = string
+  default     = ""
+}
