@@ -20,5 +20,10 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["E501"]
 
+# Our own modules, named so that import order does not depend on which build
+# output folders happen to exist on the machine running the check.
+[tool.ruff.lint.isort]
+known-first-party = ["build", "build_api", "smoke", "sync_rules", "handler", "validation"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

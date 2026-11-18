@@ -5,9 +5,9 @@ from __future__ import annotations
 import copy
 
 import pytest
-import sync_rules
 
 import build as build_tool
+import sync_rules
 
 
 def test_an_address_becomes_one_group_of_parts_that_inherit_its_condition(forms: dict) -> None:

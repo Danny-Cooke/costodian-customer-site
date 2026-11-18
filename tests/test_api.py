@@ -7,10 +7,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import build_api as api_tool
 import pytest
 
 import build as build_tool
+import build_api as api_tool
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "api"))
