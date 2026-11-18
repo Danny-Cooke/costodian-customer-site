@@ -160,9 +160,8 @@ Payment is switched off (`pricing.payment_enabled`). Sign-up is free.
 - Two-step sign-in is off for the sign-up portal. The site says every user of the
   product signs in with two steps.
 - Finishing set-up does nothing yet: nobody is told and no account is requested.
-- The pipeline's apply role cannot create the sign-up backend (it has no rights
-  over the user pool, the table, the key, the functions or the API). The backend
-  was applied by hand. The role-per-service split in the road map fixes this.
+- `scripts/destroy.sh` has never been run, and needs `jq`, which the bootstrap
+  script does not.
 - Verification emails come from the sign-in service's shared sender, which is
   limited to a small number a day and is not branded.
 
@@ -210,6 +209,31 @@ the models configured in the proof of concept when they are called in-Region in
 London (see `bedrock-claude-terms-and-availability.md` in the knowledge base). It
 would stop being true if a model were called through an EU or global inference
 profile, or if a model with a retention period were chosen.
+
+## How it is deployed
+
+Nothing is applied by hand except `scripts/bootstrap.sh <environment>`, once, by a
+person with an administrator profile. It creates the Terraform state bucket (in the
+same account), GitHub's sign-in to AWS (OIDC; no keys are stored anywhere) and the
+pipeline's roles, and writes their names into the GitHub environments.
+
+After that, `.github/workflows/site.yml` does everything:
+
+| When | Job | Signs in as | Does |
+|---|---|---|---|
+| Every push and pull request | Tests | nobody | lint, both test suites, both builds, Terraform format and validate |
+| A pull request | Terraform plan | the read-only plan role | plans the site stack and shows what would change |
+| A merge to `main` | Deploy | the deploy role | applies Terraform, builds the site with the stack's outputs, publishes it, clears the cache, smoke tests the live address |
+
+The deploy role can do nothing but read and write the state and assume one role per
+service (storage, keys, edge, identity, data, compute, access). Each Terraform provider
+assumes the role for its own service. The roles the `access` role creates for the
+functions must carry a permissions boundary. Publishing the pages uses an eighth role
+that can only write the site's files and clear the cache.
+
+A missing permission shows up as a failed deploy naming the action. Add it to
+`service_roles` in `infra/envs/dev/bootstrap/terraform.tfvars`, run the bootstrap
+script again, and re-run the pipeline.
 
 ## Known exceptions
 
