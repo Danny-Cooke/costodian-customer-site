@@ -146,6 +146,12 @@ variable "geo_restriction_locations" {
   default     = []
 }
 
+variable "force_destroy" {
+  description = "Whether Terraform may empty the site bucket to delete it. A property of the run, not of the environment: only the destroy path sets it, and the storage role's deletes are the whole of what it needs."
+  type        = bool
+  default     = false
+}
+
 variable "noncurrent_version_expiration_days" {
   description = "Days an overwritten version of a site file is kept."
   type        = number

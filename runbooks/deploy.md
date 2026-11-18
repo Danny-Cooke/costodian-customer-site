@@ -35,10 +35,10 @@ near the sign-in pool, and only it is given the pool's id. Changing what a
 function may do, or adding a function, is an edit to that map, deployed by the
 pipeline like any other commit. Changing the ceiling those roles carry
 (`function_boundary`) or what the pipeline's own roles may do (`service_roles`)
-is an edit to `infra/envs/dev/bootstrap/terraform.tfvars` and needs
-`scripts/bootstrap.sh dev` run by hand by a person with an administrator
-profile, before the pipeline runs: the pipeline cannot widen its own ceiling,
-which is the point of keeping it in a separate stack.
+is an edit to `infra/envs/dev/bootstrap/terraform.tfvars` and needs the
+`Bootstrap` workflow run, with an approval, before the Site workflow runs: the
+deploy role cannot widen its own ceiling, which is the point of keeping it in a
+separate stack reached by a separate role. See `runbooks/bootstrap.md`.
 
 Terraform zips that package but does not build it, so the directory named by
 `package_dir` in `infra/envs/dev/site/terraform.tfvars` must exist before
@@ -58,9 +58,10 @@ a different identity. Terraform is told to do that by
 false and uses the read-only plan role's own credentials for everything.
 
 Publishing the built site is not Terraform's work: the workflow chains from the
-`deploy` role into the `publish` role (`AWS_PUBLISH_ROLE_ARN` on the `dev`
-environment) for the bucket sync and the cache invalidation, and that role can
-touch nothing else.
+`deploy` role into the `publish` role for the bucket sync and the cache
+invalidation, and that role can touch nothing else. Its ARN, like every other,
+comes from `scripts/names.sh` in the workflow's `Names` job, not from a GitHub
+variable.
 
 The roles themselves are in `runbooks/bootstrap.md`.
 

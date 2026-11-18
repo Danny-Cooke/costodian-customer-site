@@ -28,6 +28,7 @@ locals {
   type_codes = {
     authorizer              = "authz"
     bucket                  = "bkt"
+    cloudformation_stack    = "stack"
     distribution            = "cdn"
     dynamodb_table          = "tbl"
     function                = "fn"

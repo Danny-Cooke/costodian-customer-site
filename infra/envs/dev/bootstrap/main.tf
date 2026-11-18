@@ -1,6 +1,11 @@
-# What the pipeline needs before it can run, and the only stack a person ever
-# applies: the GitHub sign-in provider, the Terraform state bucket, and the
+# What the pipeline needs before it can run: the Terraform state bucket and the
 # roles the workflow assumes with no stored keys.
+#
+# It is applied by the Bootstrap workflow, as the seed's bootstrap role. The
+# GitHub sign-in provider and that one role are the seed: a CloudFormation
+# stack applied once by a person (infra/seed/seed.yaml, scripts/seed.sh). This
+# stack only reads the provider, and never names, creates or deletes the role
+# that applies it.
 #
 # There is no role here that can do everything. The workflow signs in to one of
 # two entry roles, and neither of them can change an AWS resource:
@@ -27,12 +32,20 @@ module "naming" {
   types = merge(
     {
       state         = "bucket"
-      github        = "openid_connect_provider"
       plan          = "role"
       deploy        = "role"
       plan-access   = "policy"
       deploy-access = "policy"
       boundary      = "policy"
+
+      # The seed's three names. This stack composes them so that nothing is
+      # named twice, and manages none of them: scripts/seed.sh reads them from
+      # here to build the CloudFormation stack, and scripts/names.sh reads the
+      # role to tell the workflow what to assume.
+      github           = "openid_connect_provider"
+      bootstrap        = "role"
+      bootstrap-access = "policy"
+      seed             = "cloudformation_stack"
     },
     # One role per service, its inline policy, and the read-only policy the
     # plan role carries for that same service.
@@ -70,7 +83,7 @@ locals {
   site_lock_arn     = "${local.site_state_arn}${var.state_lock_suffix}"
 
   oidc_host         = trimprefix(var.github_oidc_url, "https://")
-  oidc_provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn
+  oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
   repository_path   = "${var.github_owner}/${var.github_repository}"
 
   # How GitHub names this repository in the tokens it issues. A repository set
@@ -79,10 +92,17 @@ locals {
   # bootstrap script reads the prefix from GitHub and passes it in.
   subject_prefix = var.github_subject_prefix != "" ? var.github_subject_prefix : "repo:${local.repository_path}"
 
+  # One entry role per subject. The bootstrap environment is deliberately not
+  # here: its role is the seed's, trusted by the seed for that one environment,
+  # so this stack cannot widen what applies it.
   subjects = {
     plan   = "${local.subject_prefix}:environment:${var.github_environments.plan}"
     deploy = "${local.subject_prefix}:environment:${var.github_environments.deploy}"
   }
+
+  # The subject the seed trusts, composed here so that the shape of a subject
+  # is written once.
+  seed_subject = "${local.subject_prefix}:environment:${var.github_environments.bootstrap}"
 
   # Everything each component creates carries its own prefix.
   ci_prefix      = module.naming.base
@@ -184,6 +204,74 @@ locals {
 
   missing_services = setsubtract(toset(var.services), toset(keys(var.service_roles)))
   extra_services   = setsubtract(toset(keys(var.service_roles)), toset(var.services))
+
+  # The seed grants its bootstrap role every IAM write under the ci prefix
+  # except on its own ARN, so this stack must never manage a role of that name:
+  # it could not change it, and the run would fail half way.
+  seed_role_name     = module.naming.unvalidated_names["bootstrap"]
+  managed_role_names = [for key in concat(keys(local.subjects), var.services) : module.naming.names[key]]
+}
+
+# Everything the scripts need, in one expression they read with
+# `terraform console`. Console evaluates the configuration without reading a
+# data source, so nothing here may depend on one: there is no account id and no
+# ARN in it, and scripts/lib/stack.sh composes those from the partition, the
+# names below and the account id it is given. That is the only place an ARN is
+# put together outside Terraform.
+locals {
+  script_names = {
+    project         = local.project
+    repository_path = local.repository_path
+    environment     = var.platform.environment
+
+    # The effective prefix: what scripts/seed.sh was told by GitHub, or the
+    # plain form when GitHub has nothing to say. It becomes the
+    # OIDC_SUBJECT_PREFIX repository variable, which the Bootstrap workflow
+    # passes back in so that every role trusts the same subject.
+    subject_prefix = local.subject_prefix
+
+    aws_region = var.platform.region
+    partition  = var.platform.partition
+
+    # Without the account id, which S3's global namespace adds and which only
+    # the caller knows: the scripts append it.
+    state_bucket_base   = module.naming.unvalidated_names["state"]
+    bootstrap_state_key = var.bootstrap_state_key
+    site_state_key      = var.site_state_key
+
+    role_names = {
+      bootstrap = local.seed_role_name
+      plan      = module.naming.unvalidated_names["plan"]
+      deploy    = module.naming.unvalidated_names["deploy"]
+      publish   = module.naming.unvalidated_names[var.publish_service]
+    }
+
+    environments = var.github_environments
+
+    # What scripts/seed.sh gives the CloudFormation template. Nothing
+    # project-specific is written in that template; all of this arrives as a
+    # parameter.
+    seed = {
+      stack_name               = module.naming.unvalidated_names["seed"]
+      role_name                = local.seed_role_name
+      policy_name              = module.naming.unvalidated_names["bootstrap-access"]
+      role_max_session_seconds = var.role_max_session_seconds
+      ci_name_prefix           = "${module.naming.base}-"
+      subject                  = local.seed_subject
+      # A string, because it reaches CloudFormation as a parameter whose
+      # allowed values are "true" and "false".
+      create_oidc_provider = tostring(var.create_oidc_provider)
+      oidc_name            = module.naming.unvalidated_names["github"]
+      oidc_url             = var.github_oidc_url
+      oidc_host            = local.oidc_host
+      oidc_audience        = var.github_oidc_audience
+      oidc_thumbprints     = join(",", var.github_oidc_thumbprints)
+      state_lock_suffix    = var.state_lock_suffix
+      tags = merge(local.default_tags, local.tags, {
+        ManagedBy = var.seed_managed_by
+      })
+    }
+  }
 }
 
 # Validation on a resource so that it is evaluated and fails at plan time.
@@ -207,25 +295,18 @@ resource "terraform_data" "checked" {
       condition     = contains(var.services, var.iam_service) && contains(var.services, var.publish_service)
       error_message = "bootstrap: iam_service and publish_service must each name one of var.services."
     }
+    precondition {
+      condition     = !contains(local.managed_role_names, local.seed_role_name)
+      error_message = "bootstrap: ${local.seed_role_name} is the seed's role; no service or entry role may compose that name."
+    }
   }
 }
 
 # ------------------------------------------------------------ GitHub sign-in
 
-resource "aws_iam_openid_connect_provider" "github" {
-  count = var.create_oidc_provider ? 1 : 0
-
-  url            = var.github_oidc_url
-  client_id_list = [var.github_oidc_audience]
-
-  # The provider is named by its issuer URL and cannot be renamed, so the
-  # composed name is carried as its Name tag.
-  tags = merge(local.tags, { Name = module.naming.names["github"] })
-}
-
+# Created by the seed, which an account holds one of per issuer and which
+# nothing in the pipeline may change. Read here for the trust policies below.
 data "aws_iam_openid_connect_provider" "github" {
-  count = var.create_oidc_provider ? 0 : 1
-
   url = var.github_oidc_url
 }
 
@@ -429,6 +510,11 @@ resource "aws_iam_role_policy" "service" {
 
 resource "aws_s3_bucket" "state" {
   bucket = local.state_bucket_name
+
+  # Off everywhere but the destroy path. prevent_destroy takes no variable, so
+  # it stays on and the destroy path takes the bucket out of state and deletes
+  # it directly; this is here for an operator who has lifted prevent_destroy.
+  force_destroy = var.state_bucket_force_destroy
 
   tags = merge(local.tags, { Name = local.state_bucket_name })
 

@@ -82,6 +82,11 @@ resource "aws_s3_bucket" "web" {
 
   bucket = local.bucket_name
 
+  # Off everywhere but the destroy path: the bucket is versioned, so it cannot
+  # be deleted until every version is gone and Terraform will not empty a
+  # bucket it did not fill unless it is told to.
+  force_destroy = var.force_destroy
+
   tags = merge(local.tags, { Name = local.bucket_name })
 }
 

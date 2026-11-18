@@ -4,6 +4,12 @@ variable "assume_service_roles" {
   default     = false
 }
 
+variable "web_bucket_force_destroy" {
+  description = "Whether Terraform may empty the site bucket to delete it. A property of the run, not of the environment, so it has a default: only scripts/destroy.sh sets it, and the storage role may delete the bucket's objects and nothing else."
+  type        = bool
+  default     = false
+}
+
 variable "index_document" {
   description = "The file served for a page path, and for the root. Must match the build tool's index file name."
   type        = string

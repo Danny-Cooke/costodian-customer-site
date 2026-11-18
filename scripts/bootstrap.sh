@@ -2,25 +2,34 @@
 #
 # scripts/bootstrap.sh <environment>
 #
-# The one thing a person applies by hand, once per environment. Everything else
-# is built by the GitHub pipeline, which this gives its footing: the GitHub
-# sign-in provider, the Terraform state bucket, the two entry roles and the
-# per-service roles they chain into. Afterwards it writes the names of those
-# things into the GitHub environments, so no ARN is ever typed into a workflow.
+# Applies the Terraform bootstrap stack: the state bucket, the two entry roles
+# and the per-service roles they chain into. Everything the Site workflow
+# stands on, and nothing else.
 #
-# Run it with an administrator profile for the target account already exported:
+# It is run by the Bootstrap workflow, as the seed's bootstrap role, which is
+# the only identity allowed to change these roles and which GitHub may only
+# assume from the bootstrap environment, behind an approval. It holds no
+# credentials and prints none; the workflow has signed in before it starts.
 #
-#   export AWS_PROFILE=<an administrator profile>
-#   scripts/bootstrap.sh dev
+#   GITHUB_SUBJECT_PREFIX  how GitHub names this repository in its tokens, from
+#                          the OIDC_SUBJECT_PREFIX repository variable
+#   AWS_ACCOUNT_ID         optional; asked of AWS when it is not set
 #
-# It holds no credentials and prints none. Every name it uses comes from
-# Terraform - the state bucket from the configuration before any state exists,
-# everything else from the outputs - so nothing is written down twice.
+# Every name it uses comes from the Terraform configuration, so nothing is
+# written down twice, and it writes nothing back to GitHub: scripts/names.sh
+# works the names out again on every run.
 #
-# Safe to run again: it is the same apply, and the GitHub variables are set to
-# the same values.
+# Safe to run again: it is the same apply. Run it after any change to
+# infra/envs/<environment>/bootstrap.
 
 set -euo pipefail
+
+SCRIPT_NAME=bootstrap
+
+# shellcheck source=lib/stack.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/stack.sh"
+
+trap remove_overrides EXIT
 
 usage() {
   cat >&2 <<'EOF'
@@ -29,8 +38,9 @@ usage: scripts/bootstrap.sh <environment>
   <environment>  the environment token, e.g. dev. Must match the environment
                  in infra/envs/<environment>/platform.tfvars.json.
 
-Requires AWS_PROFILE to name an administrator profile for the account, and
-the gh command line to be signed in to GitHub.
+Requires GITHUB_SUBJECT_PREFIX, and AWS credentials already in the
+environment: in GitHub Actions the workflow signs in first, and from a machine
+AWS_PROFILE does. The seed must have been applied; see runbooks/bootstrap.md.
 EOF
   exit 2
 }
@@ -38,84 +48,35 @@ EOF
 [ "$#" -eq 1 ] || usage
 environment=$1
 
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-stack_dir="$repo_root/infra/envs/$environment/bootstrap"
-platform_vars="../platform.tfvars.json"
-override_file="$stack_dir/backend_override.tf"
+require_tools terraform aws python3
 
-for tool in terraform aws gh python3; do
-  command -v "$tool" >/dev/null 2>&1 || {
-    echo "bootstrap: $tool is not on PATH." >&2
-    exit 1
-  }
-done
+[ -n "${GITHUB_SUBJECT_PREFIX:-}" ] ||
+  die "GITHUB_SUBJECT_PREFIX is not set. It is the OIDC_SUBJECT_PREFIX repository variable, set by scripts/seed.sh."
 
-[ -d "$stack_dir" ] || {
-  echo "bootstrap: no stack at $stack_dir." >&2
-  exit 1
-}
+stack=$(stack_dir "$environment" bootstrap)
+local_state="$stack/terraform.tfstate"
 
-[ -n "${AWS_PROFILE:-}" ] || {
-  echo "bootstrap: export AWS_PROFILE with an administrator profile for the account first." >&2
-  exit 1
-}
+# The state bucket may not exist yet, so the first read and the first apply
+# keep state locally. backend_override.tf is git-ignored.
+init_local "$stack"
+read_script_names "$stack"
 
-tf() {
-  terraform -chdir="$stack_dir" "$@"
-}
+configured=$(named environment)
+[ "$configured" = "$environment" ] ||
+  die "asked for $environment but infra/envs/$environment/platform.tfvars.json says $configured."
 
-# Reads one expression out of the configuration. Used for the state bucket's
-# name, which has to be known before there is any state to read it from.
-tf_console() {
-  printf '%s\n' "$1" | tf console -no-color -var-file="$platform_vars" | tr -d '"'
-}
+ACCOUNT_ID=$(account_id)
+bucket=$(state_bucket_name)
+region=$(named aws_region)
+state_key=$(named bootstrap_state_key)
 
-# The keys of a JSON object, one per line, and one of its values. Python is
-# already needed to build the site, so nothing else has to be installed.
-json_keys() {
-  python3 -c 'import json, sys; print("\n".join(sorted(json.loads(sys.argv[1]))))' "$1"
-}
+note "$environment, state bucket $bucket in $region"
+note "GitHub subject prefix $GITHUB_SUBJECT_PREFIX"
 
-json_value() {
-  python3 -c 'import json, sys; print(json.loads(sys.argv[1])[sys.argv[2]])' "$1" "$2"
-}
-
-cleanup() {
-  rm -f "$override_file"
-}
-trap cleanup EXIT
-
-# ---------------------------------------------------------------- local state
-
-# The state bucket may not exist yet, so the first init keeps state locally.
-# backend_override.tf is git-ignored.
-printf 'terraform {\n  backend "local" {}\n}\n' >"$override_file"
-# -reconfigure: an earlier run leaves this folder pointed at the bucket.
-tf init -input=false -no-color -reconfigure >/dev/null
-
-configured_environment=$(tf_console 'var.platform.environment')
-if [ "$configured_environment" != "$environment" ]; then
-  echo "bootstrap: asked for $environment but infra/envs/$environment/platform.tfvars.json says $configured_environment." >&2
-  exit 1
-fi
-
-# The bucket's name ends with the account id, which Terraform only learns when
-# it runs. Before there is any state, the name is worked out here from the same
-# two parts; after the apply it is checked against what Terraform made.
-account=$(aws sts get-caller-identity --query Account --output text)
-bucket="$(tf_console 'module.naming.unvalidated_names["state"]')-$account"
-local_state="$stack_dir/terraform.tfstate"
-region=$(tf_console 'var.platform.region')
-state_key=$(tf_console 'var.bootstrap_state_key')
-
-# GitHub decides how a repository is named in the tokens it issues; the roles
-# must trust exactly that, so it is asked rather than assumed.
-repository_path=$(tf_console 'local.repository_path')
-subject_prefix=$(gh api "repos/$repository_path/actions/oidc/customization/sub" --jq '.sub_claim_prefix // ""' 2>/dev/null || true)
-apply_vars=(-var-file="$platform_vars" -var "github_subject_prefix=$subject_prefix")
-
-echo "bootstrap: $environment, state bucket $bucket in $region"
-echo "bootstrap: GitHub subject ${subject_prefix:-repo:$repository_path}"
+apply_vars=(
+  -var-file="$PLATFORM_VARS"
+  -var "github_subject_prefix=$GITHUB_SUBJECT_PREFIX"
+)
 
 backend_config=(
   -backend-config="bucket=$bucket"
@@ -128,61 +89,31 @@ backend_config=(
 # A local state file means an earlier first run stopped before its state was
 # moved into the bucket: carry on from there.
 if [ ! -s "$local_state" ] && aws s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then
-  echo "bootstrap: state bucket exists; working against it"
-  rm -f "$override_file"
-  tf init -input=false -no-color -reconfigure "${backend_config[@]}" >/dev/null
-  tf apply -input=false -no-color -auto-approve "${apply_vars[@]}"
+  note "state bucket exists; working against it"
+  drop_override "$stack"
+  terraform -chdir="$stack" init -input=false -no-color -reconfigure "${backend_config[@]}" >/dev/null
+  terraform -chdir="$stack" apply -input=false -no-color -auto-approve "${apply_vars[@]}"
 else
-  echo "bootstrap: first run; applying with local state, then moving it into the bucket"
-  tf apply -input=false -no-color -auto-approve "${apply_vars[@]}"
-  made=$(tf output -raw state_bucket)
-  if [ "$made" != "$bucket" ]; then
-    echo "bootstrap: expected the state bucket to be $bucket but Terraform made $made. The state is still in $local_state." >&2
-    exit 1
-  fi
-  rm -f "$override_file"
-  tf init -input=false -no-color -force-copy -migrate-state "${backend_config[@]}" >/dev/null
+  note "first run; applying with local state, then moving it into the bucket"
+  terraform -chdir="$stack" apply -input=false -no-color -auto-approve "${apply_vars[@]}"
+
+  made=$(terraform -chdir="$stack" output -raw state_bucket)
+  [ "$made" = "$bucket" ] ||
+    die "expected the state bucket to be $bucket but Terraform made $made. The state is still in $local_state."
+
+  drop_override "$stack"
+  terraform -chdir="$stack" init -input=false -no-color -force-copy -migrate-state "${backend_config[@]}" >/dev/null
   rm -f "$local_state" "$local_state.backup"
 fi
-
-# ------------------------------------------------------- the GitHub side
-
-repository=$(tf output -raw github_repository_path)
-state_bucket=$(tf output -raw state_bucket)
-site_state_key=$(tf output -raw site_state_key)
-aws_region=$(tf output -raw aws_region)
-deploy_environment=$(tf output -raw deploy_environment)
-publish_role_arn=$(tf output -raw publish_role_arn)
-role_arns=$(tf output -json role_arns)
-
-echo "bootstrap: setting the GitHub environments of $repository"
-
-while IFS= read -r github_environment; do
-  role_arn=$(json_value "$role_arns" "$github_environment")
-
-  gh api -X PUT "repos/$repository/environments/$github_environment" >/dev/null
-
-  gh variable set AWS_ROLE_ARN --repo "$repository" --env "$github_environment" --body "$role_arn"
-  gh variable set AWS_REGION --repo "$repository" --env "$github_environment" --body "$aws_region"
-  gh variable set TF_STATE_BUCKET --repo "$repository" --env "$github_environment" --body "$state_bucket"
-  gh variable set TF_STATE_KEY --repo "$repository" --env "$github_environment" --body "$site_state_key"
-
-  echo "bootstrap:   $github_environment -> $role_arn"
-done < <(json_keys "$role_arns")
-
-# Only the deploy environment publishes, and it reaches the publish role by
-# chaining from its own role rather than from GitHub.
-gh variable set AWS_PUBLISH_ROLE_ARN --repo "$repository" --env "$deploy_environment" --body "$publish_role_arn"
-echo "bootstrap:   $deploy_environment -> $publish_role_arn (publish)"
 
 cat <<EOF
 
 bootstrap: done.
 
-  State      s3://$state_bucket/$state_key
-  Site state s3://$state_bucket/$site_state_key
+  Bootstrap state  s3://$bucket/$state_key
+  Site state       s3://$bucket/$(named site_state_key)
 
-Open a pull request to see the plan job run, and merge it to deploy. Nothing
-else is applied by hand; changes to this stack are applied by running this
-script again.
+The Site workflow can run: open a pull request to see the plan, merge it to
+deploy. Nothing here is applied by hand; this stack is applied by running the
+Bootstrap workflow again.
 EOF

@@ -1,13 +1,14 @@
-# What scripts/bootstrap.sh needs: everything it writes into the GitHub
-# environments, and the names it would otherwise have to be told twice.
+# What scripts/bootstrap.sh checks after an apply, and what an operator reading
+# a chain needs. The workflow is told nothing from here: scripts/names.sh works
+# every name out of the configuration, so no job needs this stack's state.
 
 output "state_bucket" {
-  description = "TF_STATE_BUCKET for every GitHub environment, and the backend bucket this stack's own state is migrated into."
+  description = "The bucket this stack's own state is migrated into, checked by scripts/bootstrap.sh against the name it worked out before the apply."
   value       = aws_s3_bucket.state.bucket
 }
 
 output "site_state_key" {
-  description = "TF_STATE_KEY for every GitHub environment."
+  description = "The key the site stack's state lives under in the same bucket."
   value       = var.site_state_key
 }
 
@@ -17,23 +18,23 @@ output "bootstrap_state_key" {
 }
 
 output "aws_region" {
-  description = "AWS_REGION for every GitHub environment."
+  description = "The Region every resource of this environment is in."
   value       = var.platform.region
 }
 
 output "role_arns" {
-  description = "AWS_ROLE_ARN for each GitHub environment, keyed by the environment's name: the plan environment gets the read-only role, the deploy environment gets the role that may only assume the service roles."
-  value       = { for key, name in var.github_environments : name => aws_iam_role.entry[key].arn }
+  description = "The entry role each GitHub environment may assume, keyed by the environment's name: the plan environment gets the read-only role, the deploy environment gets the role that may only assume the service roles. The bootstrap environment is not here; its role is the seed's."
+  value       = { for key, role in aws_iam_role.entry : var.github_environments[key] => role.arn }
 }
 
 output "publish_role_arn" {
-  description = "AWS_PUBLISH_ROLE_ARN for the deploy environment. The workflow's publish step assumes it from the deploy role; Terraform never does."
+  description = "The role the workflow's publish step assumes from the deploy role. Terraform never does."
   value       = aws_iam_role.service[var.publish_service].arn
 }
 
-output "deploy_environment" {
-  description = "Which GitHub environment holds the deploy role, so the script knows where the publish role ARN goes."
-  value       = var.github_environments.deploy
+output "github_environments" {
+  description = "The GitHub environment each role is tied to, including the seed's bootstrap environment."
+  value       = var.github_environments
 }
 
 output "service_role_arns" {

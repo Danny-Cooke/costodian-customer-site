@@ -9,10 +9,11 @@ variable "github_repository" {
 }
 
 variable "github_environments" {
-  description = "The GitHub environment each entry role is tied to. A job can only assume the role of its own environment: a pull request reaches plan, a deploy from main reaches deploy."
+  description = "The GitHub environment each role is tied to. A job can only assume the role of its own environment: a pull request reaches plan, a deploy from main reaches deploy, and the Bootstrap and Destroy workflows reach the seed's bootstrap role. The bootstrap entry is not a role of this stack - the seed owns that role and trusts that one environment - and scripts/seed.sh and scripts/names.sh read it from here."
   type = object({
-    plan   = string
-    deploy = string
+    bootstrap = string
+    plan      = string
+    deploy    = string
   })
 }
 
@@ -28,9 +29,25 @@ variable "github_oidc_audience" {
   default     = "sts.amazonaws.com"
 }
 
+variable "github_oidc_thumbprints" {
+  description = "Certificate thumbprints for the issuer, passed to the seed's CloudFormation stack. IAM ignores them for token.actions.githubusercontent.com, which it validates against its own trust store, but the resource still takes the list. Not used by this stack; read from here by scripts/seed.sh so that it is declared once."
+  type        = list(string)
+}
+
 variable "create_oidc_provider" {
-  description = "True when this account has no GitHub sign-in provider yet. An account can hold only one per issuer."
+  description = "True when this account has no GitHub sign-in provider yet; an account can hold only one per issuer. Not used by this stack - the seed creates the provider and this stack only reads it - and read from here by scripts/seed.sh so that it is declared once."
   type        = bool
+}
+
+variable "seed_managed_by" {
+  description = "The ManagedBy tag the seed's resources carry. They are the one thing not made by Terraform, so it is not the stacks' managed_by value."
+  type        = string
+}
+
+variable "state_bucket_force_destroy" {
+  description = "Whether Terraform may empty the state bucket to delete it. A property of the run, not of the environment, so it has a default and only the destroy path sets it. The bucket also carries prevent_destroy, which takes no variable, so the destroy path takes the bucket out of state and deletes it directly; this is the escape hatch for an operator who has lifted prevent_destroy by hand."
+  type        = bool
+  default     = false
 }
 
 variable "role_max_session_seconds" {

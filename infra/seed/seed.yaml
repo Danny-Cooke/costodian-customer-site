@@ -1,0 +1,392 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  The seed: the one thing in this account applied from a person's machine, once
+  per environment, and never destroyed. It is CloudFormation rather than
+  Terraform so that it needs no state bucket and no role of its own - the two
+  things it exists to make possible.
+
+  It creates GitHub's sign-in to this account (the OpenID Connect provider) and
+  one role, the bootstrap role, which GitHub may assume from one environment of
+  one repository and which may do exactly what the Terraform bootstrap stack
+  needs: the pipeline's roles and policies under one name prefix, and the
+  Terraform state bucket. It cannot change itself, this stack or the sign-in
+  provider, and it holds no other permission.
+
+  Nothing in here is written for a particular project: every name, ARN pattern,
+  subject and tag arrives as a parameter, worked out from the Terraform
+  configuration by scripts/seed.sh.
+
+# ---------------------------------------------------------------- parameters
+
+Parameters:
+  ProductTag:
+    Type: String
+    Description: The Product tag both resources carry.
+  ProjectTag:
+    Type: String
+    Description: The Project tag both resources carry.
+  EnvironmentTag:
+    Type: String
+    Description: The Environment tag both resources carry, which is the environment token.
+  RepositoryTag:
+    Type: String
+    Description: The Repository tag both resources carry.
+  ManagedByTag:
+    Type: String
+    Description: The ManagedBy tag both resources carry. These are the only resources not managed by Terraform.
+  OwnerTag:
+    Type: String
+    Description: The Owner tag both resources carry.
+  ComponentTag:
+    Type: String
+    Description: The Component tag both resources carry.
+
+  BootstrapRoleName:
+    Type: String
+    Description: Composed name of the bootstrap role, and its Name tag. It must not be a name the bootstrap stack manages; that stack fails its own plan if it ever composes this name.
+    MinLength: 1
+    MaxLength: 64
+  BootstrapPolicyName:
+    Type: String
+    Description: Composed name of the bootstrap role's inline policy.
+    MinLength: 1
+    MaxLength: 128
+  BootstrapRoleMaxSessionSeconds:
+    Type: Number
+    Description: Longest session the bootstrap role may hold.
+    MinValue: 900
+    MaxValue: 43200
+
+  CiNamePrefix:
+    Type: String
+    Description: The name prefix every role and policy of the pipeline carries, ending in a hyphen. The bootstrap role may write IAM under this prefix and nowhere else.
+    MinLength: 1
+
+  GitHubSubject:
+    Type: String
+    Description: The one subject the bootstrap role trusts, as GitHub writes it in its tokens - <subject prefix>:environment:<bootstrap environment>. One environment of one repository.
+    MinLength: 1
+
+  CreateOidcProvider:
+    Type: String
+    Description: False when the account already holds a sign-in provider for this issuer; an account can hold only one. The role trusts it either way.
+    AllowedValues: ["true", "false"]
+  OidcProviderName:
+    Type: String
+    Description: The Name tag of the sign-in provider. A provider is named by its issuer URL and cannot be renamed, so the composed name is carried as a tag.
+  GitHubOidcUrl:
+    Type: String
+    Description: Issuer of GitHub Actions' identity tokens, with its scheme.
+    MinLength: 1
+  GitHubOidcHost:
+    Type: String
+    Description: The same issuer without its scheme. It is the end of the provider's ARN and the start of every condition key in the trust policy.
+    MinLength: 1
+  GitHubOidcAudience:
+    Type: String
+    Description: The audience the token must be issued for.
+    MinLength: 1
+  GitHubOidcThumbprints:
+    Type: String
+    Description: Comma-separated certificate thumbprints of the issuer. IAM validates this issuer against its own trust store and ignores them; empty leaves the property off.
+    Default: ""
+
+  StateBucketName:
+    Type: String
+    Description: The Terraform state bucket the bootstrap stack creates, reads, writes and deletes. Its name ends with the account id, which is why it is a parameter and not composed here.
+    MinLength: 3
+    MaxLength: 63
+  BootstrapStateKey:
+    Type: String
+    Description: The object key of the bootstrap stack's own state. The role may read and write this one object.
+    MinLength: 1
+  StateLockSuffix:
+    Type: String
+    Description: What the S3 backend appends to a state key for its lock object.
+    MinLength: 1
+
+Conditions:
+  CreateProvider: !Equals [!Ref CreateOidcProvider, "true"]
+  HasThumbprints: !Not [!Equals [!Ref GitHubOidcThumbprints, ""]]
+
+Resources:
+  # ------------------------------------------------------------ GitHub sign-in
+  #
+  # How GitHub Actions signs in to this account. There are no access keys
+  # anywhere in this project; this is what replaces them.
+  GitHubSignIn:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateProvider
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Url: !Ref GitHubOidcUrl
+      ClientIdList:
+        - !Ref GitHubOidcAudience
+      ThumbprintList: !If
+        - HasThumbprints
+        - !Split [",", !Ref GitHubOidcThumbprints]
+        - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: !Ref OidcProviderName
+        - Key: Product
+          Value: !Ref ProductTag
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Repository
+          Value: !Ref RepositoryTag
+        - Key: ManagedBy
+          Value: !Ref ManagedByTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Component
+          Value: !Ref ComponentTag
+
+  # ----------------------------------------------------------- bootstrap role
+  #
+  # The only role GitHub can reach without the pipeline's roles existing, and
+  # the only role that may create them. The trust policy is written as JSON
+  # because the condition keys start with the issuer's host, and a parameter
+  # cannot be a key in a YAML map.
+  BootstrapRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref BootstrapRoleName
+      Description: !Sub "Applies and destroys the Terraform bootstrap stack of ${ProjectTag} ${EnvironmentTag}, from GitHub Actions only"
+      MaxSessionDuration: !Ref BootstrapRoleMaxSessionSeconds
+      AssumeRolePolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "GitHubActionsFromOneEnvironmentOfOneRepository",
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/${GitHubOidcHost}"
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "${GitHubOidcHost}:aud": "${GitHubOidcAudience}",
+                  "${GitHubOidcHost}:sub": "${GitHubSubject}"
+                }
+              }
+            }
+          ]
+        }
+      Policies:
+        - PolicyName: !Ref BootstrapPolicyName
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Which account the run is in. Terraform asks on every plan, and
+              # the scripts ask to complete the state bucket's name.
+              - Sid: WhoAmI
+                Effect: Allow
+                Action:
+                  - sts:GetCallerIdentity
+                Resource: "*"
+
+              # Finding the sign-in provider by its issuer URL means listing
+              # the account's providers; the call takes no resource.
+              - Sid: FindTheGitHubSignIn
+                Effect: Allow
+                Action:
+                  - iam:ListOpenIDConnectProviders
+                Resource: "*"
+
+              - Sid: ReadTheGitHubSignIn
+                Effect: Allow
+                Action:
+                  - iam:GetOpenIDConnectProvider
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/${GitHubOidcHost}"
+
+              # The pipeline's roles: the two entry roles and one per service.
+              # Every read the AWS provider makes on a refresh, and every write
+              # the stack makes, including the deletes the Destroy workflow
+              # needs. Scoped to the one name prefix.
+              - Sid: ThePipelineRoles
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListInstanceProfilesForRole
+                  - iam:ListRolePolicies
+                  - iam:ListRoleTags
+                  - iam:AttachRolePolicy
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:DeleteRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${CiNamePrefix}*"
+
+              # The managed policies the plan role carries, and the permissions
+              # boundary the pipeline's IAM role may not widen. Same prefix.
+              - Sid: ThePipelinePolicies
+                Effect: Allow
+                Action:
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:ListEntitiesForPolicy
+                  - iam:ListPolicyTags
+                  - iam:ListPolicyVersions
+                  - iam:CreatePolicy
+                  - iam:CreatePolicyVersion
+                  - iam:DeletePolicy
+                  - iam:DeletePolicyVersion
+                  - iam:SetDefaultPolicyVersion
+                  - iam:TagPolicy
+                  - iam:UntagPolicy
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${CiNamePrefix}*"
+
+              # The state bucket itself: every configuration call the AWS
+              # provider reads on a refresh, whether or not the stack sets it,
+              # and the ones it writes. CreateBucket and DeleteBucket are here
+              # because the bootstrap stack owns this bucket.
+              - Sid: TheStateBucket
+                Effect: Allow
+                Action:
+                  - s3:GetAccelerateConfiguration
+                  - s3:GetBucketAcl
+                  - s3:GetBucketCORS
+                  - s3:GetBucketLocation
+                  - s3:GetBucketLogging
+                  - s3:GetBucketNotification
+                  - s3:GetBucketObjectLockConfiguration
+                  - s3:GetBucketOwnershipControls
+                  - s3:GetBucketPolicy
+                  - s3:GetBucketPolicyStatus
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:GetBucketRequestPayment
+                  - s3:GetBucketTagging
+                  - s3:GetBucketVersioning
+                  - s3:GetBucketWebsite
+                  - s3:GetEncryptionConfiguration
+                  - s3:GetLifecycleConfiguration
+                  - s3:GetReplicationConfiguration
+                  - s3:ListBucket
+                  - s3:ListBucketVersions
+                  - s3:CreateBucket
+                  - s3:DeleteBucket
+                  - s3:DeleteBucketPolicy
+                  - s3:PutBucketOwnershipControls
+                  - s3:PutBucketPolicy
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:PutBucketTagging
+                  - s3:PutBucketVersioning
+                  - s3:PutEncryptionConfiguration
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+
+              # Its own state object and the lock the S3 backend writes beside
+              # it. Not the site stack's state: that is the deploy role's.
+              - Sid: ItsOwnState
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/${BootstrapStateKey}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/${BootstrapStateKey}${StateLockSuffix}"
+
+              # A versioned bucket cannot be deleted until every version and
+              # delete marker is gone, so emptying it is part of destroying it.
+              # Deletes only: it cannot read another stack's state.
+              - Sid: EmptyTheStateBucketToDeleteIt
+                Effect: Allow
+                Action:
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+
+              # Its own role carries the prefix above, so it would otherwise be
+              # able to rewrite its own permissions. This is why the bootstrap
+              # stack may not compose this name.
+              - Sid: NeverChangeItsOwnRole
+                Effect: Deny
+                Action:
+                  - iam:AttachRolePolicy
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:DeleteRolePermissionsBoundary
+                  - iam:DeleteRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePermissionsBoundary
+                  - iam:PutRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${BootstrapRoleName}"
+
+              # Nothing it is allowed grants any of these, and a deny holds
+              # whatever is added later: the sign-in provider is the seed's.
+              - Sid: NeverChangeTheGitHubSignIn
+                Effect: Deny
+                Action:
+                  - iam:AddClientIDToOpenIDConnectProvider
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:DeleteOpenIDConnectProvider
+                  - iam:RemoveClientIDFromOpenIDConnectProvider
+                  - iam:TagOpenIDConnectProvider
+                  - iam:UntagOpenIDConnectProvider
+                  - iam:UpdateOpenIDConnectProviderThumbprint
+                Resource: "*"
+
+              # This stack, and every other. Nothing above grants a
+              # CloudFormation call; the deny is here so that it stays that way.
+              - Sid: NeverTouchTheSeed
+                Effect: Deny
+                Action:
+                  - cloudformation:CancelUpdateStack
+                  - cloudformation:ContinueUpdateRollback
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DeleteStack
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:RollbackStack
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:TagResource
+                  - cloudformation:UntagResource
+                  - cloudformation:UpdateStack
+                  - cloudformation:UpdateTerminationProtection
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Ref BootstrapRoleName
+        - Key: Product
+          Value: !Ref ProductTag
+        - Key: Project
+          Value: !Ref ProjectTag
+        - Key: Environment
+          Value: !Ref EnvironmentTag
+        - Key: Repository
+          Value: !Ref RepositoryTag
+        - Key: ManagedBy
+          Value: !Ref ManagedByTag
+        - Key: Owner
+          Value: !Ref OwnerTag
+        - Key: Component
+          Value: !Ref ComponentTag
+
+Outputs:
+  BootstrapRoleArn:
+    Description: The role the Bootstrap and Destroy workflows assume. scripts/names.sh composes the same ARN from the configuration, so no workflow reads it from here.
+    Value: !GetAtt BootstrapRole.Arn
+  GitHubSignInArn:
+    Description: The sign-in provider every pipeline role trusts.
+    Condition: CreateProvider
+    Value: !Ref GitHubSignIn
