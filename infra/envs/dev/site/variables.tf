@@ -172,6 +172,7 @@ variable "invite_message_template" {
   type = object({
     subject = string
     message = string
+    sms     = string
   })
 }
 
