@@ -60,6 +60,11 @@
       </p>
     </div>
 
+    <div class="panel" data-owner-only hidden>
+      <h2>Waiting for an owner</h2>
+      <p>Accepting this agreement binds your firm, so only an {{ site.roles[site.first_member_role].label|lower }} of the firm's account can accept it.</p>
+    </div>
+
     <form novalidate data-form>
       <h2>Accept the agreement</h2>
       {{ ui.error_summary(forms.messages) }}

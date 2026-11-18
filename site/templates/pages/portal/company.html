@@ -31,25 +31,6 @@
         {% endif %}
       </section>
 
-      {% if section.id == 'billing' %}
-      {% set earners = forms.company.fee_earners %}
-      <section class="form-section" data-fee-earners aria-labelledby="section-fee-earners">
-        <h2 id="section-fee-earners">{{ earners.title }}</h2>
-        <p>{{ earners.intro }}</p>
-        <p class="error" data-fee-earners-error hidden></p>
-        <div data-rows></div>
-        <p><button type="button" class="button quiet" data-add-row>{{ earners.add_label }}</button></p>
-        <template data-row-template>
-          <fieldset class="group row" data-row>
-            <legend>{{ earners.row_title }}</legend>
-            {% for f in earners.fields %}
-            {{ ui.field(f, site.rule_kinds, 'earner-__row__-') }}
-            {% endfor %}
-            <p><button type="button" class="button quiet small" data-remove-row>{{ earners.remove_label }}</button></p>
-          </fieldset>
-        </template>
-      </section>
-      {% endif %}
       {% endfor %}
 
       <p class="actions"><button type="submit" class="button large">Save company information</button></p>

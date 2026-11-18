@@ -46,7 +46,7 @@
   {% for option in f.options %}
   <div class="choice">
     <input type="radio" id="{{ fid }}-{{ loop.index }}" name="{{ fid }}" value="{{ option.value }}" data-input="{{ f.id }}"{% if f.default == option.value %} checked{% endif %}>
-    <label for="{{ fid }}-{{ loop.index }}">{{ option.label }}</label>
+    <label for="{{ fid }}-{{ loop.index }}">{{ option.label }}{% if option.hint is defined and option.hint %}<span class="hint">{{ option.hint }}</span>{% endif %}</label>
   </div>
   {% endfor %}
   <p class="error" id="{{ fid }}-error" data-error hidden></p>

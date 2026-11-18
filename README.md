@@ -115,11 +115,40 @@ A build is one of two things, decided by whether it is given an app client
 |---|---|---|
 | Sign-in | `site/static/js/auth.js` | Calls the sign-in service directly. The password is sent to that service only and is never stored; the tokens are kept in the browser tab until sign out. |
 | The account | `site/static/js/account.js` | One interface for the pages, backed by the API when live and by the browser tab in a preview. |
-| The API | `api/handler.py`, `api/validation.py` | Three functions (read, write, accept), each under its own role. Checks every value against the same field definitions the pages are built from; keeps only known fields that are on show. An agreement acceptance is written once. |
+| The API | `api/handler.py`, `api/validation.py` | Five functions (read, enrol, write, accept, people), each under its own role. Checks every value against the same field definitions the pages are built from; keeps only known fields that are on show. An agreement acceptance is written once. |
 | The package | `tools/build_api.py` | Copies `api/` and writes its settings to `build/api/`. |
 | Infrastructure | `infra/modules/account` | User pool, table, key, functions, HTTP API; served under `/api/*` on the site's address. |
 
 Payment is switched off (`pricing.payment_enabled`). Sign-up is free.
+
+### Firms, owners and administrators
+
+What is entered belongs to a **firm**, and people are members of it. The person who
+signs up becomes the firm's first owner. Roles and what each may do are in `roles` and
+`permissions` in `site/config/site.json`; the API reads the person's role on every
+request.
+
+| | Owner | Administrator |
+|---|---|---|
+| Accept the agreement; pay (when payment exists) | Yes | No |
+| Invite and remove people, change roles | Yes | No |
+| Edit the firm's details and its billing answers | Yes | Yes |
+
+- An invitation creates the person's sign-in; they are emailed a temporary password
+  and choose their own the first time they sign in.
+- A firm always has at least one owner. Removing a person ends their access at once
+  and deletes their sign-in.
+- Every change is added to the firm's change record with who made it and when; the
+  People page shows it.
+- **The rule for the product:** every owner and administrator here is an administrator
+  of the product itself, and the product takes that list from here. Who works on which
+  case is managed in the product. Not built: no product account is created yet.
+- **Fee earners are not entered here.** They are part of the product's own user
+  management.
+
+Table layout: `ACCOUNT#<person>` holds `membership` (firm and role) and `person` (their
+own details); `FIRM#<id>` holds `firm`, `company`, the agreement acceptance, one
+`member#<person>` per member and one `change#<time>` per change.
 
 ## What is tested
 

@@ -48,6 +48,13 @@ module "account" {
   platform  = local.platform
   component = var.components.account
 
+  # The invitation email tells a new member where to sign in, which is the
+  # site's own address. The pool therefore waits on the distribution, which
+  # waits on the API's address above; the pool is not an input to the API, so
+  # the three order themselves and there is no cycle.
+  product_name = var.product_name
+  site_url     = module.web.site_url
+
   function_permissions_boundary_arn = local.function_permissions_boundary_arn
 
   key_admin_actions    = var.key_admin_actions
@@ -69,6 +76,11 @@ module "account" {
   client_auth_flows             = var.client_auth_flows
   token_validity                = var.token_validity
   token_validity_units          = var.token_validity_units
+
+  temporary_password_validity_days = var.temporary_password_validity_days
+  invite_message_template          = var.invite_message_template
+  verification_message_template    = var.verification_message_template
+  required_message_placeholders    = var.required_message_placeholders
 
   functions              = var.functions
   package_dir            = var.package_dir

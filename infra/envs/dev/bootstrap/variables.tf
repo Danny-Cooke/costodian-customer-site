@@ -116,6 +116,7 @@ variable "function_boundary" {
     dynamodb_actions = list(string)
     kms_actions      = list(string)
     logs_actions     = list(string)
+    cognito_actions  = list(string)
   })
 }
 

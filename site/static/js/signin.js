@@ -14,6 +14,7 @@ const asProblems = (messages) => messages.map((message) => ({ message }));
 // Held only while this page is open.
 let credentials = null;
 let resetEmail = "";
+let challenge = "";
 
 function show(name, moveFocus = true) {
   for (const panel of panels) panel.hidden = panel.dataset.panel !== name;
@@ -35,6 +36,11 @@ function wire(name, fields, action) {
     try {
       await action(entered);
     } catch (error) {
+      if (error.newPasswordNeeded && credentials) {
+        challenge = error.session;
+        show("new-password");
+        return;
+      }
       if (error.notConfirmed && credentials) {
         await account.auth.resend(credentials.email).catch(() => {});
         show("verify");
@@ -65,6 +71,14 @@ if (!account.live) {
     await account.auth.confirm(credentials.email, entered[codeField.id]);
     await account.auth.signIn(credentials.email, credentials.password);
     credentials = null;
+    window.location.assign(data.routes.portal);
+  });
+
+  const [newPasswordField] = data.newPasswordFields;
+  wire("new-password", data.newPasswordFields, async (entered) => {
+    await account.auth.newPassword(credentials.email, entered[newPasswordField.id], challenge);
+    credentials = null;
+    challenge = "";
     window.location.assign(data.routes.portal);
   });
 

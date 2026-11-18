@@ -1,8 +1,10 @@
-# The sign-up back end: a Cognito pool the firm signs itself up in, one
-# DynamoDB table holding the account record, and three small functions behind an
-# HTTP API that only accepts a Cognito token. Everything is encrypted with one
-# customer-managed key, and every function has its own role: the read function
-# cannot write and the write function cannot read.
+# The sign-up back end: a Cognito pool the firm signs itself up in and invites
+# its members to, one DynamoDB table holding the account record, and one small
+# function per job behind an HTTP API that only accepts a Cognito token.
+# Everything is encrypted with one customer-managed key, and every function has
+# its own role, built from the exact table, key and pool actions that function
+# needs: the read function cannot write, and only the function that manages the
+# firm's members may touch the pool.
 #
 # There is no bucket, queue or function here that could hold an identity
 # document. The API is reached through the site's CloudFront distribution, so it
@@ -79,6 +81,53 @@ locals {
       }
     }
   ]...)
+
+  # What each placeholder in the message templates stands for. The key is the
+  # placeholder's name and the token text is composed from it with
+  # var.placeholder_format, so the token is written in tfvars and nowhere else.
+  placeholders = {
+    product  = var.product_name
+    site_url = var.site_url
+    days     = tostring(var.temporary_password_validity_days)
+  }
+
+  message_templates = {
+    invite       = var.invite_message_template
+    verification = var.verification_message_template
+  }
+
+  # Terraform has no fold over a map, so the substitutions are chained: one
+  # pass per key of local.placeholders. Adding a placeholder is a key above and
+  # a pass here. Cognito's own {username} and {####} match nothing and survive.
+  messages = {
+    for key, template in local.message_templates : key => {
+      for field, text in template : field => replace(replace(replace(
+        text,
+        format(var.placeholder_format, "product"), local.placeholders["product"]),
+        format(var.placeholder_format, "site_url"), local.placeholders["site_url"]),
+      format(var.placeholder_format, "days"), local.placeholders["days"])
+    }
+  }
+
+  missing_placeholders = flatten([
+    for key, required in var.required_message_placeholders : [
+      for token in required : "${key}.${token}"
+      if !strcontains(local.messages[key].message, token)
+    ]
+  ])
+}
+
+# Validation on a resource so that it is evaluated and fails at plan time: a
+# message missing a placeholder Cognito requires is refused at apply.
+resource "terraform_data" "messages" {
+  input = local.messages
+
+  lifecycle {
+    precondition {
+      condition     = length(local.missing_placeholders) == 0
+      error_message = "account: message templates are missing placeholders Cognito requires ${jsonencode(local.missing_placeholders)}."
+    }
+  }
 }
 
 # ------------------------------------------------------------------- the key
@@ -212,8 +261,23 @@ resource "aws_cognito_user_pool" "this" {
     case_sensitive = var.username_case_sensitive
   }
 
+  # Self sign-up stays open: a firm signs itself up, and an owner invites the
+  # rest of the firm. The invitation is the email an invited member receives.
   admin_create_user_config {
     allow_admin_create_user_only = var.allow_admin_create_user_only
+
+    invite_message_template {
+      email_subject = local.messages["invite"]["subject"]
+      email_message = local.messages["invite"]["message"]
+    }
+  }
+
+  # The code a person who signs the firm up themselves confirms the address
+  # with.
+  verification_message_template {
+    default_email_option = var.verification_default_email_option
+    email_subject        = local.messages["verification"]["subject"]
+    email_message        = local.messages["verification"]["message"]
   }
 
   password_policy {
@@ -348,6 +412,20 @@ data "aws_iam_policy_document" "function" {
     actions   = each.value.key_actions
     resources = [aws_kms_key.this.arn]
   }
+
+  # Only a function that manages the firm's members gets this, and only on this
+  # one pool. The statement is left out entirely when the list is empty, so no
+  # other function's role mentions Cognito at all.
+  dynamic "statement" {
+    for_each = length(each.value.pool_actions) > 0 ? [each.value.pool_actions] : []
+
+    content {
+      sid       = "AdministerPeopleInThisPoolOnly"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [aws_cognito_user_pool.this.arn]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "function" {
@@ -382,13 +460,18 @@ resource "aws_lambda_function" "this" {
   }
 
   # The table's name and key attribute names, so the code holds no literal
-  # either. Nothing here is a secret.
+  # either. Nothing here is a secret. The pool's id is given only to a function
+  # whose role may act on the pool, so a function that is not allowed to cannot
+  # even name it.
   environment {
-    variables = {
-      TABLE_NAME      = aws_dynamodb_table.this.name
-      TABLE_HASH_KEY  = var.table_hash_key
-      TABLE_RANGE_KEY = var.table_range_key
-    }
+    variables = merge(
+      {
+        TABLE_NAME      = aws_dynamodb_table.this.name
+        TABLE_HASH_KEY  = var.table_hash_key
+        TABLE_RANGE_KEY = var.table_range_key
+      },
+      length(each.value.pool_actions) > 0 ? { USER_POOL_ID = aws_cognito_user_pool.this.id } : {},
+    )
   }
 
   tags = merge(local.tags, { Name = module.naming.names[each.key] })

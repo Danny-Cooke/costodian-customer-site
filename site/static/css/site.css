@@ -844,3 +844,56 @@ input.short {
   padding: 0.5rem 0.75rem;
   margin: 0 0 1rem;
 }
+
+/* The people who manage a firm's account, and the record of changes. */
+.people,
+.changes {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.person {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.person-email {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.person-role {
+  display: block;
+}
+
+.person-manage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.changes li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.changes time,
+.choice .hint {
+  display: block;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+.roles dt {
+  font-weight: 600;
+}
+
+.roles dd {
+  margin: 0 0 0.75rem;
+}

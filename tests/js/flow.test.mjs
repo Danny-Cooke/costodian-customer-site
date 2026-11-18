@@ -177,12 +177,10 @@ test("the account is ready only when both steps are done for the current agreeme
 // ------------------------------------------------------ company information
 
 const BILLING = { laa_account_number: "0A123B", office_region: "London", vat_number: "123456789" };
-const EARNER = { name: "Sam Example", initials: "SE", grade: "A" };
-const firstRow = (page) => page.one("[data-row]");
 
-test("company information opens with one fee earner row and the cautious positions chosen", async () => {
+test("company information opens with the cautious positions chosen and no fee earners to enter", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
-  assert.equal(page.all("[data-row]").length, 1);
+  assert.equal(page.all("[data-row], [data-add-row]").length, 0, "fee earners are managed in the product");
   assert.equal(page.one('[data-input="position_UNITS-6MIN"]:checked').value, "round_down");
   assert.equal(page.one('[data-input="position_ROUTINE-COUNT"]:checked').value, "per_message");
   assert.equal(page.one('[data-section="legal_aid"]').hidden, false);
@@ -196,16 +194,14 @@ test("company information is not saved while anything on show is missing", async
   assert.equal(page.error("laa_account_number"), "Enter LAA account number");
   assert.equal(page.error("office_region"), "Choose office region");
   assert.equal(page.error("vat_number"), "Enter VAT number");
-  assert.equal(page.error("name", firstRow(page)), "Enter name");
   assert.equal(page.error("private_rate_a"), "", "a hidden section is not checked");
   assert.equal(page.one("[data-saved]").hidden, true);
   assert.equal("company" in page.state(), false);
 });
 
-test("a complete company information page is saved with the positions and the fee earners", async () => {
+test("a complete company information page is saved with the positions", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
   fill(page, BILLING);
-  fill(page, EARNER, firstRow(page));
   page.set("position_ROUTINE-COUNT", "per_recipient");
   page.submit();
 
@@ -219,7 +215,7 @@ test("a complete company information page is saved with the positions and the fe
   assert.equal(company.values["position_UNITS-6MIN"], "round_down");
   assert.equal(company.values["position_BILL-PREP-TIME"], "30");
   assert.equal("private_rate_a" in company.values, false);
-  assert.deepEqual(company.feeEarners.map((earner) => earner.initials), ["SE"]);
+  assert.equal("feeEarners" in company, false);
 });
 
 test("without VAT registration the VAT number is neither shown nor required", async () => {
@@ -227,7 +223,6 @@ test("without VAT registration the VAT number is neither shown nor required", as
   page.set("vat_registered", false);
   assert.equal(page.field("vat_number").hidden, true);
   fill(page, { laa_account_number: "0A123B", office_region: "Non-London" });
-  fill(page, EARNER, firstRow(page));
   page.submit();
   assert.equal(page.one("[data-saved]").hidden, false);
   assert.equal("vat_number" in page.state().company.values, false);
@@ -242,7 +237,6 @@ test("a private-only firm fills in private charging and is not asked for legal a
   assert.equal(page.field("laa_account_number").hidden, true);
 
   fill(page, { office_region: "London", vat_number: "123456789" });
-  fill(page, EARNER, firstRow(page));
   page.submit();
   assert.equal(page.error("private_rate_a"), "Enter hourly rate for grade A in pounds");
   assert.equal(page.error("laa_account_number"), "");
@@ -263,48 +257,22 @@ test("a private-only firm fills in private charging and is not asked for legal a
   assert.equal("position_UNITS-6MIN" in values, false, "legal aid positions are not kept for a private-only firm");
 });
 
-test("at least one type of funding and one fee earner are needed", async () => {
+test("at least one type of funding is needed", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
   page.set("funding_legal_aid", false);
-  page.click(page.one("[data-remove-row]"));
-  assert.equal(page.all("[data-row]").length, 0);
   page.submit();
   assert.equal(page.one("[data-funding-error]").hidden, false);
-  assert.equal(page.one("[data-fee-earners-error]").hidden, false);
   assert.equal("company" in page.state(), false);
-});
-
-test("fee earners can be added, each with its own fields, and a consultant has no firm rate", async () => {
-  const page = await open("company", storageWith(SIGNED_UP));
-  page.click(page.one("[data-add-row]"));
-  const [first, second] = page.all("[data-row]");
-  const ids = page.all("[data-row] [id]").map((element) => element.id);
-  assert.equal(ids.length, new Set(ids).size, "ids stay unique across rows");
-
-  fill(page, BILLING);
-  fill(page, { ...EARNER, hourly_rate: "280" }, first);
-  fill(page, { name: "Alex Consultant", initials: "AC", grade: "B", own_terms: true }, second);
-  assert.equal(page.field("hourly_rate", second).hidden, true);
-  assert.equal(page.field("hourly_rate", first).hidden, false);
-  page.submit();
-
-  const { feeEarners } = page.state().company;
-  assert.equal(feeEarners.length, 2);
-  assert.equal(feeEarners[0].hourly_rate, "280");
-  assert.equal(feeEarners[1].own_terms, true);
-  assert.equal("hourly_rate" in feeEarners[1], false);
 });
 
 test("saved company information is shown again when the page is reopened", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
   fill(page, BILLING);
-  fill(page, EARNER, firstRow(page));
   page.submit();
 
   const again = await open("company", page.storage);
   assert.equal(again.one('[data-input="laa_account_number"]').value, BILLING.laa_account_number);
   assert.equal(again.one('[data-input="office_region"]:checked').value, "London");
-  assert.equal(again.one('[data-row] [data-input="initials"]').value, "SE");
 });
 
 // --------------------------------------------------------------- agreements

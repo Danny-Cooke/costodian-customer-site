@@ -37,6 +37,7 @@
     "portal": "/portal/",
     "details": "/portal/details/",
     "company": "/portal/company/",
+    "people": "/portal/people/",
     "agreements": "/portal/agreements/",
     "not_found": "/404.html"
   },
@@ -52,6 +53,7 @@
       "portal",
       "details",
       "company",
+      "people",
       "agreements"
     ]
   },
@@ -154,9 +156,20 @@
       "area": "portal",
       "label": "Company information",
       "title": "Company information",
-      "description": "Billing set-up, fee earners and the firm's positions.",
+      "description": "Billing set-up and how your firm bills.",
       "scripts": [
         "company"
+      ]
+    },
+    {
+      "route": "people",
+      "template": "pages/portal/people.html",
+      "area": "portal",
+      "label": "People",
+      "title": "People",
+      "description": "Who can manage your firm's account.",
+      "scripts": [
+        "people"
       ]
     },
     {
@@ -190,7 +203,7 @@
       "id": "company",
       "route": "company",
       "title": "Company information",
-      "summary": "Billing set-up, fee earners and how your firm bills."
+      "summary": "Billing set-up and how your firm bills."
     },
     {
       "id": "agreement",
@@ -237,14 +250,50 @@
   "api": {
     "base_path": "/api",
     "account_path": "/account",
-    "agreement_path": "/account/agreement"
+    "agreement_path": "/account/agreement",
+    "firm_path": "/account/firm",
+    "people_path": "/account/people"
   },
   "limits": {
-    "max_fee_earners": 100,
     "max_text_length": 2000,
-    "max_body_bytes": 65536
+    "max_body_bytes": 65536,
+    "max_members": 50,
+    "max_changes_shown": 50
   },
   "portal": {
     "details_route": "details"
+  },
+  "roles": {
+    "owner": {
+      "label": "Owner",
+      "summary": "Accepts the agreement, pays the bill, and decides who the owners and administrators are. Can do everything an administrator can."
+    },
+    "admin": {
+      "label": "Administrator",
+      "summary": "Keeps the firm's details and its billing answers up to date."
+    }
+  },
+  "default_invite_role": "admin",
+  "first_member_role": "owner",
+  "permissions": {
+    "write": [
+      "owner",
+      "admin"
+    ],
+    "accept": [
+      "owner"
+    ],
+    "people": [
+      "owner"
+    ]
+  },
+  "changes": {
+    "created": "set up the firm's account",
+    "signup": "changed the details",
+    "company": "changed the company information",
+    "agreement": "accepted the agreement",
+    "invited": "invited {subject} as {role}",
+    "role": "made {subject} {role}",
+    "removed": "removed {subject}"
   }
 }

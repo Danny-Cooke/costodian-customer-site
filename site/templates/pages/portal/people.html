@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% import "partials/fields.html" as ui %}
+{% block main %}
+<section class="page-head">
+  <div class="wrap narrow">
+    <h1>{{ page.title }}</h1>
+    <p class="lead">The people who can manage your firm's account. Everyone here is also an administrator of {{ site.product.name }} itself; the people who work on cases are managed there.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <p class="notice" data-notice role="status" tabindex="-1" hidden></p>
+
+    <h2>Who can manage this account</h2>
+    <dl class="roles">
+      {% for id, role in site.roles.items() %}
+      <dt>{{ role.label }}</dt>
+      <dd>{{ role.summary }}</dd>
+      {% endfor %}
+    </dl>
+
+    <ul class="people" data-people></ul>
+    <template data-person-template>
+      <li class="person">
+        <div>
+          <span class="person-email" data-person-email></span>
+          <span class="badge" data-person-you hidden>You</span>
+          <span class="person-role" data-person-role></span>
+        </div>
+        <div class="person-manage" data-person-manage hidden>
+          {% for id, role in site.roles.items() %}
+          <button type="button" class="button quiet small" data-make="{{ id }}">Make {{ role.label|lower }}</button>
+          {% endfor %}
+          <button type="button" class="button quiet small" data-remove>Remove</button>
+        </div>
+      </li>
+    </template>
+  </div>
+</section>
+
+<section class="band alt" data-invite hidden>
+  <div class="wrap narrow">
+    <h2>Invite someone</h2>
+    <p>They are sent an email with a temporary password, and choose their own the first time they sign in.</p>
+    <form novalidate data-form>
+      {{ ui.error_summary(forms.messages) }}
+      {% for f in forms.people.invite.fields %}
+      {{ ui.field(f, site.rule_kinds) }}
+      {% endfor %}
+      <p class="actions"><button type="submit" class="button large">Send the invitation</button></p>
+    </form>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap narrow">
+    <h2>What has changed</h2>
+    <p>Every change to this account, with who made it and when. Newest first.</p>
+    <ul class="changes" data-changes></ul>
+  </div>
+</section>
+{% endblock %}

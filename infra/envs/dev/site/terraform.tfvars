@@ -100,7 +100,9 @@ table_deletion_protection = true
 username_attributes      = ["email"]
 auto_verified_attributes = ["email"]
 
-# A firm signs itself up; nobody creates the account for it.
+# A firm signs itself up; nobody creates the account for it. It stays false now
+# that an owner can invite the rest of the firm: closing it would also close
+# self sign-up.
 allow_admin_create_user_only = false
 
 password_minimum_length    = 12
@@ -108,6 +110,29 @@ password_require_uppercase = true
 password_require_lowercase = true
 password_require_numbers   = true
 password_require_symbols   = true
+
+# How long an invited member has to use the temporary password. The invitation
+# email states this same number.
+temporary_password_validity_days = 7
+
+# The two emails the pool sends. {product}, {site_url} and {days} are put in by
+# the account module; {username} and {####} are Cognito's own and are required
+# in these messages, so they are left as they are written here.
+invite_message_template = {
+  subject = "You have been invited to {product}"
+  message = "You have been invited to help manage your firm's {product} account.<br><br>Sign in at {site_url}/signin/ with:<br><br>Email address: {username}<br>Temporary password: {####}<br><br>You will be asked to choose your own password the first time you sign in. The temporary password stops working after {days} days."
+}
+
+verification_message_template = {
+  subject = "Your {product} code"
+  message = "Your {product} confirmation code is {####}"
+}
+
+# What Cognito refuses a message without. Checked at plan.
+required_message_placeholders = {
+  invite       = ["{username}", "{####}"]
+  verification = ["{####}"]
+}
 
 # Off until the second factor is decided. A firm handling client money should
 # have one; raising it is a change here and a change on the sign-in page.
@@ -132,26 +157,56 @@ token_validity_units = {
   refresh = "days"
 }
 
-# One package, three handlers, three roles. The actions are the whole of each
-# role: read cannot write, and write cannot read.
+# One package, one handler and one role per job. The three action lists are the
+# whole of each role: read cannot write, nothing but people may touch the
+# sign-in pool, and a function that reads nothing is given no read action.
+# A key action list is Decrypt alone where the function only reads, and
+# Decrypt with GenerateDataKey where it writes.
 functions = {
   read = {
     handler       = "handler.read"
     routes        = ["GET /api/account"]
     table_actions = ["dynamodb:Query"]
     key_actions   = ["kms:Decrypt"]
+    pool_actions  = []
+  }
+  enrol = {
+    handler       = "handler.enrol"
+    routes        = ["POST /api/account/firm"]
+    table_actions = ["dynamodb:Query", "dynamodb:PutItem", "dynamodb:DeleteItem"]
+    key_actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    pool_actions  = []
   }
   write = {
     handler       = "handler.write"
     routes        = ["PUT /api/account/{section}"]
-    table_actions = ["dynamodb:PutItem"]
+    table_actions = ["dynamodb:GetItem", "dynamodb:PutItem"]
     key_actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    pool_actions  = []
   }
   accept = {
     handler       = "handler.accept"
     routes        = ["POST /api/account/agreement"]
-    table_actions = ["dynamodb:PutItem"]
+    table_actions = ["dynamodb:GetItem", "dynamodb:PutItem"]
     key_actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    pool_actions  = []
+  }
+  # The only function given the pool's id, and the only one that may create,
+  # remove or sign out a member. It cannot change the pool itself.
+  people = {
+    handler = "handler.people"
+    routes = [
+      "POST /api/account/people",
+      "PUT /api/account/people/{member}",
+      "DELETE /api/account/people/{member}",
+    ]
+    table_actions = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:DeleteItem"]
+    key_actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    pool_actions = [
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminDeleteUser",
+      "cognito-idp:AdminUserGlobalSignOut",
+    ]
   }
 }
 

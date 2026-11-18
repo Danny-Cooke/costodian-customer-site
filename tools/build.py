@@ -120,6 +120,15 @@ def prepare(items: list[dict[str, Any]], site: dict[str, Any]) -> list[dict[str,
         key = item.pop("min_length_key", None)
         if key is not None:
             item["min_length"] = lookup(site, key)
+        key = item.pop("options_key", None)
+        if key is not None:
+            item["options"] = [
+                {"value": value, "label": choice["label"], "hint": choice.get("summary", "")}
+                for value, choice in lookup(site, key).items()
+            ]
+        key = item.pop("default_key", None)
+        if key is not None:
+            item["default"] = lookup(site, key)
         if isinstance(item.get("fields"), list):
             item["fields"] = prepare(item["fields"], site)
         kept.append(item)
@@ -266,9 +275,6 @@ def build_forms(forms: dict[str, Any], rules: dict[str, Any], site: dict[str, An
     add_section({**company["legal_aid"], "id": "legal_aid"}, position_fields(company["legal_aid"], rules), "positions")
     add_section({**company["private"], "id": "private"}, company["private"]["fields"])
 
-    earner_tree, earner_flat, _ = expand(company["fee_earners"]["fields"], forms)
-    fee_earners = {**company["fee_earners"], "fields": earner_tree, "flat": earner_flat}
-
     agreement_tree, agreement_flat, _ = expand(forms["agreement"]["fields"], forms)
 
     return {
@@ -277,10 +283,11 @@ def build_forms(forms: dict[str, Any], rules: dict[str, Any], site: dict[str, An
         "verify": simple(forms["verify"]["fields"]),
         "signin": simple(forms["signin"]["fields"]),
         "reset": {"request": simple(forms["reset"]["request"]), "confirm": simple(forms["reset"]["confirm"])},
+        "new_password": simple(forms["new_password"]["fields"]),
+        "people": {"invite": simple(forms["people"]["invite"])},
         "agreement": {"fields": agreement_tree, "flat": agreement_flat},
         "company": {
             "sections": sections,
-            "fee_earners": fee_earners,
             "funding_ids": [field["id"] for field in company["funding"]["fields"]],
         },
         "register_version": rules["register_version"],
@@ -310,11 +317,17 @@ def page_data(page: dict[str, Any], site: dict[str, Any], forms: dict[str, Any])
         "api": {
             "account": site["api"]["base_path"] + site["api"]["account_path"],
             "agreement": site["api"]["base_path"] + site["api"]["agreement_path"],
+            "firm": site["api"]["base_path"] + site["api"]["firm_path"],
+            "people": site["api"]["base_path"] + site["api"]["people_path"],
         },
+        "roles": site["roles"],
+        "permissions": site["permissions"],
+        "firstMemberRole": site["first_member_role"],
     }
     scripts = page.get("scripts", [])
     steps = [
-        {key: step[key] for key in ("id", "title", "profile", "groups")} | {"fields": step["flat"]}
+        {key: step[key] for key in ("id", "title", "profile", "groups")}
+        | {"fields": step["flat"], "scope": step.get("scope", "")}
         for step in forms["signup"]["steps"]
     ]
     if "signup" in scripts:
@@ -327,6 +340,11 @@ def page_data(page: dict[str, Any], site: dict[str, Any], forms: dict[str, Any])
         data["verifyFields"] = forms["verify"]["flat"]
         data["resetRequestFields"] = forms["reset"]["request"]["flat"]
         data["resetConfirmFields"] = forms["reset"]["confirm"]["flat"]
+        data["newPasswordFields"] = forms["new_password"]["flat"]
+    if "people" in scripts:
+        data["inviteFields"] = forms["people"]["invite"]["flat"]
+        data["changes"] = site["changes"]
+        data["maxChangesShown"] = site["limits"]["max_changes_shown"]
     if "agreements" in scripts:
         data["fields"] = forms["agreement"]["flat"]
     if "company" in scripts:
@@ -335,9 +353,7 @@ def page_data(page: dict[str, Any], site: dict[str, Any], forms: dict[str, Any])
             {key: section[key] for key in ("id", "title", "show_if", "groups")} | {"fields": section["flat"]}
             for section in company["sections"]
         ]
-        data["feeEarners"] = {"fields": company["fee_earners"]["flat"]}
         data["fundingIds"] = company["funding_ids"]
-        data["maxFeeEarners"] = site["limits"]["max_fee_earners"]
         data["registerVersion"] = forms["register_version"]
     return data
 

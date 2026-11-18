@@ -19,6 +19,16 @@ variable "component" {
   type        = string
 }
 
+variable "product_name" {
+  description = "The product's name as a person reads it, put in place of the product placeholder in the messages the pool sends. Declared once in platform.tfvars.json and passed in."
+  type        = string
+}
+
+variable "site_url" {
+  description = "Where the site is, put in place of the site-address placeholder in the invitation message. Passed in by the caller: this module does not know how the site is served."
+  type        = string
+}
+
 # ------------------------------------------------------------------- the key
 
 variable "key_rotation_enabled" {
@@ -162,6 +172,39 @@ variable "temporary_password_validity_days" {
   default     = 7
 }
 
+variable "invite_message_template" {
+  description = "The email a person invited to an existing firm is sent. Written in tfvars with placeholders: this module puts the product's name, the site's address and the temporary password's lifetime in, and leaves Cognito's own user name and one-time code placeholders alone."
+  type = object({
+    subject = string
+    message = string
+  })
+}
+
+variable "verification_message_template" {
+  description = "The email a person who signs the firm up themselves is sent to confirm the address. Same placeholders as the invitation."
+  type = object({
+    subject = string
+    message = string
+  })
+}
+
+variable "verification_default_email_option" {
+  description = "CONFIRM_WITH_CODE sends a code the person types in; CONFIRM_WITH_LINK sends a link. The sign-up page asks for a code."
+  type        = string
+  default     = "CONFIRM_WITH_CODE"
+}
+
+variable "placeholder_format" {
+  description = "How a placeholder is written in the message templates. %s is the placeholder's name, so the token text is composed from the name and never written twice."
+  type        = string
+  default     = "{%s}"
+}
+
+variable "required_message_placeholders" {
+  description = "The placeholders Cognito itself requires in each message, by template key. Checked at plan, because a template missing one is refused at apply."
+  type        = map(list(string))
+}
+
 variable "account_recovery_mechanism" {
   description = "How a forgotten password is recovered. Verified email only: no SMS, so no phone number is held."
   type        = string
@@ -234,12 +277,13 @@ variable "token_validity_units" {
 # ------------------------------------------------------------- the functions
 
 variable "functions" {
-  description = "One entry per function: its handler, the routes it answers, and the exact table and key actions it needs. One role is built per entry from these two lists, so a function can never do another's work."
+  description = "One entry per function: its handler, the routes it answers, and the exact table, key and user pool actions it needs. One role is built per entry from those three lists, so a function can never do another's work. A function with no pool actions gets no pool statement and is not told the pool's id."
   type = map(object({
     handler       = string
     routes        = list(string)
     table_actions = list(string)
     key_actions   = list(string)
+    pool_actions  = list(string)
   }))
 }
 

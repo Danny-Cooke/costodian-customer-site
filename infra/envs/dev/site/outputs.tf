@@ -38,6 +38,11 @@ output "password_minimum_length" {
   value       = var.password_minimum_length
 }
 
+output "invite_expiry_days" {
+  description = "How long an invited member's temporary password lasts, so the portal states the number the pool enforces."
+  value       = var.temporary_password_validity_days
+}
+
 output "api_base_path" {
   description = "The path the sign-up API is reached on, on the site's own origin."
   value       = trimsuffix(var.api_path_pattern, "/*")

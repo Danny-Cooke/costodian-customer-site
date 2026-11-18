@@ -136,7 +136,7 @@ def test_company_information_renders_every_field_it_validates(pages: dict[str, P
     data = json.loads(pages["company"].json_blocks[0])
     expected = {field["id"] for section in data["sections"] for field in section["fields"] if field["type"] != "note"}
     assert expected and expected <= pages["company"].inputs
-    assert data["feeEarners"]["fields"], "the fee earner row has fields"
+    assert "feeEarners" not in data, "fee earners are managed in the product, not here"
 
 
 def test_names_are_not_typed_into_templates_or_scripts(site: dict) -> None:

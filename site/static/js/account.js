@@ -21,6 +21,8 @@ function previewAccount(data) {
   };
   return {
     live: false,
+    // A preview has one person, who can do everything.
+    can: () => true,
     signedIn: () => isSignedUp(store.load()),
     load: async () => store.load(),
     state: () => store.load(),
@@ -65,13 +67,31 @@ function liveAccount(data, options) {
     return found.length > 0 ? found : [data.messages.save_failed];
   }
 
-  function send(method, url, body, section, done, failed) {
-    request(method, url, body)
+  // A person who has just signed up has no firm yet: the first thing that
+  // needs one creates it, with them as its owner.
+  async function enrolled() {
+    if (state.member) return;
+    await request("POST", data.api.firm);
+    await read();
+  }
+
+  async function read() {
+    const { status, answer } = await request("GET", data.api.account);
+    if (status === 401) return null;
+    if (status !== 200) throw new Error(`the account could not be read: ${status}`);
+    state = Object.fromEntries(Object.entries(answer).filter(([, value]) => value !== null));
+    return state;
+  }
+
+  // Sends one change. The answer's keys replace the same keys of the state.
+  function send(method, url, body, done, failed) {
+    enrolled()
+      .then(() => request(method, url, body))
       .then(({ status, answer }) => {
         if (status === 401) return window.location.assign(data.routes.signin);
         if (status !== 200) return failed(problemsOf(answer));
-        state = { ...state, [section]: answer[section] };
-        return done(answer[section]);
+        state = { ...state, ...answer };
+        return done(answer);
       })
       .catch(() => failed([data.messages.save_failed]));
   }
@@ -81,18 +101,23 @@ function liveAccount(data, options) {
     auth,
     signedIn: () => auth.signedIn(),
     async load() {
-      const { status, answer } = await request("GET", data.api.account);
-      if (status === 401) return null;
-      if (status !== 200) throw new Error(`the account could not be read: ${status}`);
-      state = Object.fromEntries(Object.entries(answer).filter(([, value]) => value !== null));
+      if ((await read()) === null) return null;
+      await enrolled();
       return state;
     },
+    // Whether the signed-in person's role allows something: write, accept, people.
+    can: (permission) => data.permissions[permission].includes(state.member?.role),
     state: () => state,
     draft: () => drafts.load().signupDraft ?? {},
     saveDraft: (values) => drafts.save({ signupDraft: values }),
     clearDraft: () => drafts.clear(),
-    save: (section, payload, done, failed) => send("PUT", `${data.api.account}/${section}`, payload, section, done, failed),
-    accept: (values, nameFieldId, done, failed) => send("POST", data.api.agreement, { values }, "agreement", done, failed),
+    save: (section, payload, done, failed) =>
+      send("PUT", `${data.api.account}/${section}`, payload, (answer) => done(answer[section]), failed),
+    accept: (values, nameFieldId, done, failed) =>
+      send("POST", data.api.agreement, { values }, (answer) => done(answer.agreement), failed),
+    invite: (values, done, failed) => send("POST", data.api.people, { values }, done, failed),
+    changeRole: (member, role, done, failed) => send("PUT", `${data.api.people}/${member}`, { role }, done, failed),
+    removePerson: (member, done, failed) => send("DELETE", `${data.api.people}/${member}`, undefined, done, failed),
     signOut(done) {
       drafts.clear();
       auth.signOut().finally(done);
