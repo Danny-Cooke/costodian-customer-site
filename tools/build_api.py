@@ -30,16 +30,9 @@ KEYS = {
     "change_prefix": "change#",
     "agreement_prefix": "agreement#",
 }
-# How they were keyed in the one table every firm shared, for moving firms out of it.
-LEGACY_KEYS = {
-    "account_prefix": "ACCOUNT#",
-    "firm_prefix": "FIRM#",
-    "membership": "membership",
-    "person": "person",
-}
 SCRIPTS = ("signup", "company", "agreements", "people")
 CONFIG_KEYS = {"agreements": "agreement"}
-PAGE_KEYS = ("steps", "sections", "fundingIds", "versionField", "fields", "agreement", "inviteFields")
+PAGE_KEYS = ("steps", "types", "sections", "fundingIds", "versionField", "fields", "agreement", "inviteFields")
 
 
 def api_config(site: dict[str, Any]) -> dict[str, Any]:
@@ -56,9 +49,11 @@ def api_config(site: dict[str, Any]) -> dict[str, Any]:
     config["roles"] = sorted(site["roles"])
     config["permissions"] = site["permissions"]
     config["firstMemberRole"] = site["first_member_role"]
-    config["legacyKeys"] = LEGACY_KEYS
     config["customerStatuses"] = site["customer_statuses"]
     config["customerLabel"] = site["customer_label"]
+    config["customerLabelAnswers"] = site["customer_label_answers"]
+    config["account"] = site["account"]
+    config["identity"] = site["identity"]
     config["retention"] = site["retention"]
     return config
 

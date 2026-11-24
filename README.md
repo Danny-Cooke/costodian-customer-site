@@ -14,7 +14,7 @@ be clicked through. There is no API, no database, no sign-in and no payment yet.
 | Page | What it does |
 |---|---|
 | Home, How it works, Security and compliance, Pricing | The public site, for legally aided and privately funded work. Security and compliance maps each feature to the SRA duty it answers |
-| Sign up | About you, your firm, your sign-in, and confirm. No payment yet. |
+| Sign up | Account type, about you, the questions for that type, your sign-in, and confirm. No payment yet. |
 | Portal: My account | The checklist a firm sees after signing up |
 | Portal: Your details | The person's and the firm's details |
 | Portal: Company information | Funding types, billing set-up and the version the firm runs. How a firm charges its own clients is set up in the product, not here. |
@@ -109,6 +109,44 @@ A build is one of two things, decided by whether it is given an app client
 
 Payment is switched off (`pricing.payment_enabled`). Sign-up is free.
 
+### A sign-up for each kind of account
+
+Sign-up starts with an **account type**. Each type has a set of questions of its own,
+defined separately in `signup.types` in `forms.json`. They are not one form with parts
+hidden: a question only exists for the types it is asked of, the browser shows and
+checks only the chosen type's block, and the API accepts only that type's answers.
+
+| Type | Regulated by | Asked only of this kind |
+|---|---|---|
+| Solicitor: sole practice | SRA, as a firm | firm SRA number; trading name allowed |
+| Solicitors: partnership | SRA, as a firm | firm SRA number; the partners |
+| Solicitors: LLP | SRA, as a firm | LLP number; firm SRA number; designated members |
+| Solicitors: limited company | SRA, as a firm | company number; firm SRA number; directors |
+| Solicitor: freelance | SRA, as an individual | their own SRA number; no trading name, company or staff |
+| Costs Lawyer | Costs Lawyer Standards Board, as an individual | CL number; how the business is set up; who instructs them |
+| Costs draftsman | nobody | how the business is set up; who instructs them; who supervises |
+
+Why they differ is recorded with its sources in the sibling repository:
+`../automation-portal/.claude/context/signup-practice-types.md` and
+`clsb-costs-lawyer-regulation.md`.
+
+**One shape for whatever creates the account.** Whatever was asked, the API reduces
+the answers to the same few facts, kept as `account` beside the answers and copied to
+the customer's label:
+
+| Fact | What it is |
+|---|---|
+| `name` | the legal name: a registered company or LLP name, a partnership's name, or a person's own |
+| `trading_name` | the name traded under, where there is one |
+| `slug` | the name cut down to a-z, 0-9 and hyphens, for use inside resource names with a prefix and postfix |
+| `type`, `portal` | the kind of account, and which portal it belongs to (`practice` or `costs`) |
+| `regulator`, `regulator_number` | `sra`, `clsb` or `none`, and the firm SRA number, own SRA number or CL number |
+| `legal_form` | sole, partnership, llp, company or individual |
+| `company_number` | where the business is registered at Companies House |
+
+The portal after sign-up is still one portal. Separate ones for the solicitor types and
+the costs types are to come; `portal` is recorded now so that they can be.
+
 ### Firms, owners and administrators
 
 What is entered belongs to a **firm**, and people are members of it. The person who
@@ -162,8 +200,8 @@ Inside a customer's table: `FIRM` holds `firm`, `company`, the agreement accepta
 `member#<person>` per member, one `change#<time>` per change and the `claim`;
 `PERSON#<person>` holds that person's own details.
 
-The earlier single table still exists so that firms saved in it are moved into their
-own table the next time someone from the firm signs in.
+The earlier single table still exists, empty, and is no longer read. It is to be
+removed.
 
 Not built: a way for a customer to leave (the status and dates exist; nothing sets
 them yet), and the product writing the last-case date.

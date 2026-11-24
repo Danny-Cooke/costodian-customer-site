@@ -71,3 +71,17 @@
   <ul></ul>
 </div>
 {% endmacro %}
+
+{# One block of questions for each kind of account. Only the block for the kind
+   chosen is shown; the others take no part in the form. #}
+{% macro account_types(types) %}
+{% for kind in types %}
+<div class="account-type" data-type="{{ kind.id }}" hidden>
+  <p class="account-type-name">{{ kind.label }}</p>
+  {% if kind.intro %}<p>{{ kind.intro }}</p>{% endif %}
+  {% for f in kind.fields %}
+  {{ field(f, kind.id ~ '-') }}
+  {% endfor %}
+</div>
+{% endfor %}
+{% endmacro %}

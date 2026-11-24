@@ -25,13 +25,13 @@ YOU = {
     "person_phone": "020 7946 0000",
 }
 FIRM = {
-    "firm_name": "Example Law LLP",
-    "firm_sra_number": "123456",
-    "firm_type": "partnership",
-    "firm_office_line1": "1 High Street",
-    "firm_office_town": "London",
-    "firm_office_postcode": "SE1 1AA",
-    "firm_correspondence_same": True,
+    "account_type": "partnership",
+    "account_name": "Example Law",
+    "sra_number": "123456",
+    "principals": "Sam Example, Alex Example",
+    "office_line1": "1 High Street",
+    "office_town": "London",
+    "office_postcode": "SE1 1AA",
 }
 ACCEPT = {"accept_name": "Sam Example", "accept_tick": True}
 
@@ -176,7 +176,6 @@ ENVIRONMENT = {
     "CUSTOMER_KEY_ALIAS_TEMPLATE": "alias/test-customer-{number}-key",
     "DATA_ROLE_ARN": "arn:aws:iam::111122223333:role/test-data-role",
     "DATA_ACTIONS": "dynamodb:Query,dynamodb:GetItem",
-    "LEGACY_TABLE_NAME": "legacy",
     "VERSIONS_PARAMETER": VERSIONS,
     "VERSION_TAG_PATTERN": r"^v[0-9]+\.[0-9]+(\.[0-9]+)?$",
 }
@@ -193,7 +192,6 @@ def api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     handler.CONFIG_PATH = config
     handler.config.cache_clear()
     handler.tables = {}
-    handler.old_table = FakeTable()
     handler.people_service = FakeDirectory()
     handler.labels = FakeParameters()
     handler.people_service.register(OWNER, OWNER_EMAIL)
@@ -205,7 +203,6 @@ def api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
         return handler.tables.setdefault(number, FakeTable())
 
     monkeypatch.setattr(handler, "store", store)
-    monkeypatch.setattr(handler, "legacy", lambda: handler.old_table)
     monkeypatch.setattr(handler, "directory", lambda: handler.people_service)
     monkeypatch.setattr(handler, "parameters", lambda: handler.labels)
     CURRENT["directory"] = handler.people_service
@@ -364,37 +361,6 @@ def test_the_free_numbers_are_found_across_every_page_of_labels(api: Any) -> Non
     assert api.free_numbers() == [f"{n:04d}" for n in range(1, POOL + 1)]
 
 
-def test_a_firm_saved_in_the_shared_table_is_moved_into_its_own(api: Any) -> None:
-    old = api.old_table
-    for sort, data in {
-        "firm": {"values": FIRM, "completedAt": "2026-11-18T16:00:00.000Z"},
-        "company": {"values": {"office_region": "London"}, "savedAt": "x"},
-        api.agreement_key(): {"acceptedBy": "Sam Example", "version": "draft-0.1"},
-        "member#" + OWNER: {
-            "sub": OWNER,
-            "email": OWNER_EMAIL,
-            "role": "owner",
-            "addedBy": OWNER_EMAIL,
-            "addedAt": "2026-11-18T15:00:00.000Z",
-        },
-        "change#1": {"at": "2026-11-18T15:00:00.000Z", "by": OWNER_EMAIL, "what": "created"},
-    }.items():
-        old.put_item({"pk": "FIRM#abc", "sk": sort, "data": data})
-    old.put_item({"pk": "ACCOUNT#" + OWNER, "sk": "membership", "data": {"firmId": "abc", "role": "owner"}})
-    old.put_item({"pk": "ACCOUNT#" + OWNER, "sk": "person", "data": {"values": YOU}})
-
-    assert answer(api.enrol(event())) == (200, {"member": {"role": "owner"}, "renew": True})
-    seen = view(api)
-    assert seen["signup"]["values"] == {**YOU, **FIRM}
-    assert seen["signup"]["completedAt"] == "2026-11-18T16:00:00.000Z"
-    assert seen["company"]["values"] == {"office_region": "London"}
-    assert seen["agreement"]["acceptedBy"] == "Sam Example"
-    assert [change["what"] for change in seen["changes"]] == ["created"], "its history comes with it"
-    assert old.items == {}, "nothing is left in the shared table"
-    label = api.labels.label("0001")
-    assert (label["status"], label["name"], label["sra_number"]) == ("set-up complete", FIRM["firm_name"], "123456")
-
-
 def test_a_person_the_firm_removed_is_not_given_a_firm_of_their_own(firm: Any) -> None:
     invite(firm)
     alex = member(firm, "alex@example.test")["sub"]
@@ -414,17 +380,20 @@ def test_a_person_the_firm_removed_is_not_given_a_firm_of_their_own(firm: Any) -
 
 def test_the_label_follows_what_the_firm_has_saved(firm: Any) -> None:
     label = firm.labels.label("0001")
-    assert (label["status"], label["name"], label["sra_number"]) == ("signed up", FIRM["firm_name"], "123456")
+    assert (label["status"], label["name"], label["regulator_number"]) == ("signed up", FIRM["account_name"], "123456")
+    assert (label["account_type"], label["portal"], label["regulator"], label["legal_form"]) == (
+        "partnership",
+        "practice",
+        "sra",
+        "partnership",
+    )
+    assert label["slug"] == "example-law"
     assert label["company_number"] is None, "a partnership has no company number"
 
     firm.write(event({"values": company_values(firm)}, section="company"))
     assert firm.labels.label("0001")["status"] == "signed up", "the agreement is still to do"
     firm.accept(event({"values": ACCEPT}))
     assert firm.labels.label("0001")["status"] == "set-up complete"
-
-    company = {**YOU, **FIRM, "firm_type": "llp", "firm_company_number": "OC123456"}
-    firm.write(event({"values": company}, section="signup"))
-    assert firm.labels.label("0001")["company_number"] == "OC123456"
 
 
 def test_the_label_is_written_only_when_it_changes(firm: Any) -> None:
@@ -435,9 +404,9 @@ def test_the_label_is_written_only_when_it_changes(firm: Any) -> None:
 
 def test_a_customer_marked_as_left_stays_left(firm: Any) -> None:
     firm.write_label("0001", status="left", left_on="2027-01-10")
-    firm.write(event({"values": {**YOU, **FIRM, "firm_name": "Renamed LLP"}}, section="signup"))
+    firm.write(event({"values": {**YOU, **FIRM, "account_name": "Renamed LLP"}}, section="signup"))
     label = firm.labels.label("0001")
-    assert (label["status"], label["name"]) == ("left", "Renamed LLP")
+    assert (label["status"], label["name"], label["slug"]) == ("left", "Renamed LLP", "renamed-llp")
     assert label["delete_after"] == "2034-01-10"
 
 
@@ -484,25 +453,25 @@ def test_details_are_split_between_the_person_and_the_firm_and_read_back_whole(f
 
 
 def test_only_known_fields_on_show_are_kept(firm: Any) -> None:
-    sent = {**YOU, **FIRM, "is_admin": True, "person_password": "Secret-password-1", "firm_company_number": "12345678"}
+    sent = {**YOU, **FIRM, "is_admin": True, "person_password": "Secret-password-1", "company_number": "12345678"}
     stored = answer(firm.write(event({"values": sent}, section="signup")))[1]["signup"]["values"]
-    assert not {"is_admin", "person_password", "firm_company_number"} & set(stored)
+    assert not {"is_admin", "person_password", "company_number"} & set(stored)
 
 
 def test_details_that_fail_the_form_rules_are_refused_and_nothing_changes(firm: Any) -> None:
     before = dict(firm.tables["0001"].items)
-    bad = {**YOU, **FIRM, "person_email": "sam-at-example", "firm_name": ""}
+    bad = {**YOU, **FIRM, "person_email": "sam-at-example", "account_name": ""}
     status, body = answer(firm.write(event({"values": bad}, section="signup")))
     assert status == 422
-    assert set(body["errors"]) == {"person_email", "firm_name"}
+    assert set(body["errors"]) == {"person_email", "account_name"}
     assert firm.tables["0001"].items == before
 
 
 @pytest.mark.parametrize("value", [{"nested": 1}, ["a"], 12, "x" * 5000])
 def test_a_value_of_the_wrong_shape_or_size_is_refused(firm: Any, value: Any) -> None:
-    status, body = answer(firm.write(event({"values": {**YOU, **FIRM, "firm_name": value}}, section="signup")))
+    status, body = answer(firm.write(event({"values": {**YOU, **FIRM, "account_name": value}}, section="signup")))
     assert status == 422
-    assert "firm_name" in body["errors"]
+    assert "account_name" in body["errors"]
 
 
 def test_a_choice_that_is_not_one_of_the_options_is_refused(firm: Any) -> None:
@@ -517,7 +486,7 @@ def test_a_body_that_is_not_the_expected_json_is_refused(firm: Any, body: str) -
 
 
 def test_a_body_over_the_size_limit_is_refused(firm: Any) -> None:
-    oversized = json.dumps({"values": {"firm_name": "x" * (firm.config()["limits"]["max_body_bytes"] + 1)}})
+    oversized = json.dumps({"values": {"account_name": "x" * (firm.config()["limits"]["max_body_bytes"] + 1)}})
     assert answer(firm.write(event(oversized, section="signup"))) == (400, {"error": "too_large"})
 
 
@@ -546,15 +515,18 @@ def test_company_information_needs_a_funding_type(firm: Any) -> None:
 
 def test_two_firms_never_see_each_other(firm: Any) -> None:
     firm.enrol(event(subject=STRANGER, email="other@example.test"))
-    other = {**YOU, **FIRM, "firm_name": "Other Firm", "person_email": "other@example.test"}
+    other = {**YOU, **FIRM, "account_name": "Other Firm", "person_email": "other@example.test"}
     firm.write(event({"values": other}, section="signup", subject=STRANGER, email="other@example.test"))
-    assert view(firm)["signup"]["values"]["firm_name"] == FIRM["firm_name"]
+    assert view(firm)["signup"]["values"]["account_name"] == FIRM["account_name"]
     theirs = view(firm, STRANGER, "other@example.test")
-    assert theirs["signup"]["values"]["firm_name"] == "Other Firm"
+    assert theirs["signup"]["values"]["account_name"] == "Other Firm"
     assert [person["email"] for person in theirs["people"]] == ["other@example.test"]
-    assert firm.tables["0001"].data("FIRM", "firm")["values"]["firm_name"] == FIRM["firm_name"]
-    assert firm.tables["0002"].data("FIRM", "firm")["values"]["firm_name"] == "Other Firm"
-    assert (firm.labels.label("0001")["name"], firm.labels.label("0002")["name"]) == (FIRM["firm_name"], "Other Firm")
+    assert firm.tables["0001"].data("FIRM", "firm")["values"]["account_name"] == FIRM["account_name"]
+    assert firm.tables["0002"].data("FIRM", "firm")["values"]["account_name"] == "Other Firm"
+    assert (firm.labels.label("0001")["name"], firm.labels.label("0002")["name"]) == (
+        FIRM["account_name"],
+        "Other Firm",
+    )
 
 
 def test_a_person_cannot_act_on_a_member_of_another_firm(firm: Any) -> None:
@@ -580,7 +552,7 @@ def test_an_owner_invites_an_administrator_who_then_belongs_to_the_firm(firm: An
     assert list(firm.tables) == ["0001"], "an invitation takes no new number"
     theirs = view(firm, invited["sub"], "alex@example.test")
     assert theirs["member"]["role"] == "admin"
-    assert theirs["signup"]["values"]["firm_name"] == FIRM["firm_name"], "they see the firm's details"
+    assert theirs["signup"]["values"]["account_name"] == FIRM["account_name"], "they see the firm's details"
     assert theirs["signup"]["values"]["person_email"] == "alex@example.test", "and their own, not the owner's"
     assert "person_name" not in theirs["signup"]["values"]
     assert body["changes"][0]["what"] == "invited"
@@ -700,7 +672,7 @@ def test_every_change_is_recorded_with_who_made_it_newest_first(firm: Any) -> No
 
 def test_a_refused_change_is_not_recorded(firm: Any) -> None:
     before = len(view(firm)["changes"])
-    firm.write(event({"values": {**YOU, **FIRM, "firm_name": ""}}, section="signup"))
+    firm.write(event({"values": {**YOU, **FIRM, "account_name": ""}}, section="signup"))
     assert len(view(firm)["changes"]) == before
 
 
@@ -783,3 +755,209 @@ def test_saving_again_on_the_same_version_records_no_move(firm: Any) -> None:
     choose(firm, "v1.0")
     choose(firm, "v1.0")
     assert sum(change["what"] == "version" for change in view(firm)["changes"]) == 1
+
+
+# ---------------------------------------------------------- kinds of account
+
+OFFICE = {"office_line1": "1 High Street", "office_town": "London", "office_postcode": "SE1 1AA"}
+# One complete, valid sign-up for each kind of account, and the facts every kind is reduced to.
+KINDS: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {
+    "sole_practice": (
+        {"account_name": "Sam Example", "trading_name": "Example & Co", "sra_number": "123456", **OFFICE},
+        {
+            "portal": "practice",
+            "regulator": "sra",
+            "legal_form": "sole",
+            "regulator_number": "123456",
+            "company_number": None,
+            "slug": "example-co",
+        },
+    ),
+    "partnership": (
+        {"account_name": "Example Law", "sra_number": "123456", "principals": "A Partner, B Partner", **OFFICE},
+        {
+            "portal": "practice",
+            "regulator": "sra",
+            "legal_form": "partnership",
+            "regulator_number": "123456",
+            "company_number": None,
+            "slug": "example-law",
+        },
+    ),
+    "llp": (
+        {
+            "account_name": "Example Law LLP",
+            "company_number": "OC123456",
+            "sra_number": "654321",
+            "principals": "A Member, B Member",
+            **OFFICE,
+        },
+        {
+            "portal": "practice",
+            "regulator": "sra",
+            "legal_form": "llp",
+            "regulator_number": "654321",
+            "company_number": "OC123456",
+            "slug": "example-law-llp",
+        },
+    ),
+    "company": (
+        {
+            "account_name": "Example Law Limited",
+            "company_number": "01234567",
+            "sra_number": "654321",
+            "principals": "A Director",
+            **OFFICE,
+        },
+        {
+            "portal": "practice",
+            "regulator": "sra",
+            "legal_form": "company",
+            "regulator_number": "654321",
+            "company_number": "01234567",
+            "slug": "example-law-limited",
+        },
+    ),
+    "freelance_solicitor": (
+        {"account_name": "Sam Example", "sra_number": "112233", "reserved_work": "yes", "insured": "yes", **OFFICE},
+        {
+            "portal": "practice",
+            "regulator": "sra",
+            "legal_form": "individual",
+            "regulator_number": "112233",
+            "company_number": None,
+            "slug": "sam-example",
+        },
+    ),
+    "costs_lawyer": (
+        {
+            "account_name": "Example Costs Ltd",
+            "legal_form": "company",
+            "company_number": "07654321",
+            "cl_number": "cl 1234",
+            "instructed_by": "firms",
+            "insured": "yes",
+            **OFFICE,
+        },
+        {
+            "portal": "costs",
+            "regulator": "clsb",
+            "legal_form": "company",
+            "regulator_number": "CL1234",
+            "company_number": "07654321",
+            "slug": "example-costs-ltd",
+        },
+    ),
+    "costs_draftsman": (
+        {"account_name": "Jo Example", "legal_form": "sole", "instructed_by": "both", "insured": "no", **OFFICE},
+        {
+            "portal": "costs",
+            "regulator": "none",
+            "legal_form": "sole",
+            "regulator_number": None,
+            "company_number": None,
+            "slug": "jo-example",
+        },
+    ),
+}
+
+
+def sign_up_as(api: Any, kind: str, answers: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    return answer(api.write(event({"values": {**YOU, "account_type": kind, **answers}}, section="signup")))
+
+
+def test_there_is_a_sign_up_for_every_kind_of_account(api: Any) -> None:
+    assert [kind["id"] for kind in api.config()["signup"]["types"]] == list(KINDS)
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_every_kind_of_account_is_reduced_to_the_same_facts(api: Any, kind: str) -> None:
+    answers, facts = KINDS[kind]
+    api.enrol(event())
+    status, body = sign_up_as(api, kind, answers)
+    assert status == 200, body
+
+    account = api.tables["0001"].data("FIRM", "firm")["account"]
+    assert set(account) == {
+        "type",
+        "portal",
+        "regulator",
+        "legal_form",
+        "name",
+        "trading_name",
+        "slug",
+        "regulator_number",
+        "company_number",
+    }
+    assert account["type"] == kind
+    assert account["name"] == answers["account_name"]
+    assert {name: account[name] for name in facts} == facts
+
+    label = api.labels.label("0001")
+    assert (label["account_type"], label["name"], label["slug"], label["portal"]) == (
+        kind,
+        account["name"],
+        facts["slug"],
+        facts["portal"],
+    )
+    assert (label["regulator"], label["regulator_number"]) == (facts["regulator"], facts["regulator_number"])
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_each_kind_is_asked_only_its_own_questions(api: Any, kind: str) -> None:
+    """Answers to another kind's questions are not kept, and this kind's required ones are insisted on."""
+    answers, _ = KINDS[kind]
+    own = {field["id"] for field in next(k for k in api.config()["signup"]["types"] if k["id"] == kind)["fields"]}
+    every_question = {field["id"] for k in api.config()["signup"]["types"] for field in k["fields"]}
+    strays = {name: "x" for name in every_question - own}
+    api.enrol(event())
+    status, body = sign_up_as(api, kind, {**answers, **strays})
+    assert status == 200, body
+    assert not set(strays) & set(body["signup"]["values"])
+
+    status, body = sign_up_as(api, kind, {"account_name": answers["account_name"]})
+    assert status == 422 and body["errors"], "the rest of this kind's questions are still required"
+
+
+def test_what_only_some_kinds_have_is_not_asked_of_the_others(api: Any) -> None:
+    asked = {kind["id"]: {field["id"] for field in kind["fields"]} for kind in api.config()["signup"]["types"]}
+    assert "trading_name" not in asked["freelance_solicitor"], "a freelance solicitor practises in their own name"
+    assert "company_number" not in asked["freelance_solicitor"] | asked["sole_practice"] | asked["partnership"]
+    assert "company_number" in asked["llp"] & asked["company"]
+    assert "cl_number" in asked["costs_lawyer"] and "cl_number" not in asked["costs_draftsman"]
+    assert "sra_number" not in asked["costs_lawyer"] | asked["costs_draftsman"]
+    assert all("principals" in asked[kind] for kind in ("partnership", "llp", "company"))
+    assert "principals" not in asked["sole_practice"] | asked["freelance_solicitor"]
+
+
+def test_a_costs_business_gives_a_company_number_only_if_it_is_a_company_or_llp(api: Any) -> None:
+    answers, _ = KINDS["costs_draftsman"]
+    api.enrol(event())
+    status, body = sign_up_as(api, "costs_draftsman", {**answers, "legal_form": "llp"})
+    assert status == 422 and "company_number" in body["errors"]
+    status, body = sign_up_as(api, "costs_draftsman", {**answers, "legal_form": "sole", "company_number": "07654321"})
+    assert status == 200 and "company_number" not in body["signup"]["values"]
+
+
+@pytest.mark.parametrize("kind", ["", "barrister", None, 7])
+def test_a_kind_of_account_that_is_not_one_of_ours_is_refused(api: Any, kind: Any) -> None:
+    api.enrol(event())
+    status, body = answer(api.write(event({"values": {**YOU, **FIRM, "account_type": kind}}, section="signup")))
+    assert status == 422
+    assert body["errors"] == {"account_type": api.config()["messages"]["account_type_unknown"]}
+    assert ("FIRM", "firm") not in api.tables["0001"].items
+
+
+@pytest.mark.parametrize(
+    ("name", "slug"),
+    [
+        ("Smith & Jones LLP", "smith-jones-llp"),
+        ("  O'Brien, Patel + Co.  ", "o-brien-patel-co"),
+        ("A Very Long Name Indeed For A Firm Of Solicitors", "a-very-long-name-indeed"),
+        ("!!!", None),
+    ],
+)
+def test_a_name_is_cut_down_to_what_is_safe_in_a_resource_name(api: Any, name: str, slug: str | None) -> None:
+    assert api.slug_of(name) == slug
+    limit = api.config()["account"]["slug_max_length"]
+    assert slug is None or (len(slug) <= limit and not slug.startswith("-") and not slug.endswith("-"))

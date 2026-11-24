@@ -6,6 +6,7 @@
 import { openAccount } from "./account.js";
 import { applyVisibility, fillValues, readValues, showErrors, showMessage, showSummary } from "./form.js";
 import { focusOn, pageData } from "./page.js";
+import { createPractice } from "./practice.js";
 import { displayValue, isVisible, validateFields, visibleValues } from "./validate.js";
 
 const data = pageData();
@@ -18,6 +19,9 @@ const steps = data.steps;
 const allFields = steps.flatMap((step) => step.fields);
 const allGroups = steps.flatMap((step) => step.groups);
 const profileFields = steps.filter((step) => step.profile).flatMap((step) => step.fields);
+const practice = createPractice(form, data);
+// A step's questions: its own, or those of the kind of account chosen.
+const fieldsOf = (step) => (step.kind === "types" ? practice.fields() : step.fields);
 const lastIndex = steps.length - 1;
 const identity = data.identity;
 let current = 0;
@@ -25,20 +29,23 @@ let current = 0;
 let credentials = null;
 
 const sectionOf = (step) => form.querySelector(`[data-step="${CSS.escape(step.id)}"]`);
-const values = () => readValues(form, allFields);
+const values = () => ({ ...readValues(form, allFields), ...practice.values() });
+// What is worth keeping of the answers given: the fields on show.
+const kept = (fields) => ({ ...visibleValues(fields, readValues(form, fields)), ...practice.kept() });
 const asProblems = (messages) => messages.map((message) => ({ message }));
 
 function refreshVisibility() {
   const entered = values();
   applyVisibility(form, allFields, entered);
   applyVisibility(form, allGroups, entered);
+  practice.refresh();
 }
 
 function renderReview() {
   const entered = values();
   review.replaceChildren();
   steps.slice(0, lastIndex).forEach((step) => {
-    const shown = step.fields.filter((field) => field.type !== "note" && !field.secret && isVisible(field, entered));
+    const shown = fieldsOf(step).filter((field) => field.type !== "note" && !field.secret && isVisible(field, entered));
     if (shown.length === 0) return;
     const heading = document.createElement("h3");
     heading.textContent = step.title;
@@ -68,10 +75,10 @@ function show(index, moveFocus = true) {
   if (moveFocus) focusOn(sectionOf(steps[index]).querySelector("h2"));
 }
 
-function finish(entered) {
+function finish() {
   account.save(
     "signup",
-    { values: visibleValues(account.live ? profileFields : allFields, entered) },
+    { values: kept(account.live ? profileFields : allFields) },
     () => {
       account.clearDraft();
       window.location.assign(data.routes.portal);
@@ -109,18 +116,21 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   const step = steps[current];
   const entered = values();
-  const problems = showErrors(form, step.fields, validateFields(step.fields, entered, data.messages));
+  const problems =
+    step.kind === "types"
+      ? practice.check(data.messages)
+      : showErrors(form, step.fields, validateFields(step.fields, entered, data.messages));
   showSummary(summary, problems);
   if (problems.length > 0) return;
 
   if (current < lastIndex) {
-    account.saveDraft(visibleValues(allFields, entered));
+    account.saveDraft(kept(allFields));
     show(current + 1);
     return;
   }
 
   if (account.live) createSignIn(entered);
-  else finish(entered);
+  else finish();
 });
 
 if (verify) {
@@ -139,7 +149,7 @@ if (verify) {
       await account.auth.confirm(credentials.email, entered[data.verifyFields[0].id]);
       await account.auth.signIn(credentials.email, credentials.password);
       credentials = null;
-      finish(values());
+      finish();
     } catch (error) {
       showSummary(verifySummary, asProblems([data.messages[error.messageKey]]));
     }
@@ -155,6 +165,10 @@ if (verify) {
   });
 }
 
-fillValues(form, allFields, { ...(account.state().signup?.values ?? {}), ...account.draft() });
+const earlier = { ...(account.state().signup?.values ?? {}), ...account.draft() };
+fillValues(form, allFields, earlier);
+// The kind of account has to be chosen before its questions can be filled.
+practice.refresh();
+practice.fill(earlier);
 refreshVisibility();
 show(0, false);

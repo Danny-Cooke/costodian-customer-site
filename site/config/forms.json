@@ -34,7 +34,8 @@
     "no_firm": "Your sign-in is not attached to a firm's account.",
     "auth_new_password": "Choose your own password to finish signing in.",
     "no_capacity": "We are setting up your account. Try again in a few minutes.",
-    "version_older": "Choose the version you are on, or a newer one"
+    "version_older": "Choose the version you are on, or a newer one",
+    "account_type_unknown": "Choose the kind of account from the list"
   },
   "formats": {
     "email": {
@@ -64,6 +65,14 @@
     "url": {
       "pattern": "^(https?://)?[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(/\\S*)?$",
       "message": "Enter a website address"
+    },
+    "cl_number": {
+      "pattern": "^[Cc][Ll] ?[0-9]{1,8}$",
+      "message": "Enter the Costs Lawyer number, which starts with CL"
+    },
+    "ico_number": {
+      "pattern": "^[A-Za-z]{1,2}[0-9A-Za-z]{6,8}$",
+      "message": "Enter the registration number as it appears on the ICO register"
     }
   },
   "address_parts": [
@@ -99,6 +108,22 @@
   ],
   "signup": {
     "steps": [
+      {
+        "id": "type",
+        "title": "Account type",
+        "profile": true,
+        "scope": "firm",
+        "intro": "Choose what describes you. The questions that follow are the ones for that kind of account.",
+        "fields": [
+          {
+            "id": "account_type",
+            "label": "account type",
+            "type": "select",
+            "required": true,
+            "options_from_types": true
+          }
+        ]
+      },
       {
         "id": "you",
         "title": "About you",
@@ -176,109 +201,13 @@
         "scope": "person"
       },
       {
-        "id": "firm",
-        "title": "Your firm",
-        "intro": "The firm that will hold the account.",
-        "fields": [
-          {
-            "id": "firm_name",
-            "label": "firm name",
-            "type": "text",
-            "required": true,
-            "autocomplete": "organization",
-            "max_length": 160,
-            "help": "As it appears on the SRA register."
-          },
-          {
-            "id": "firm_trading_name",
-            "label": "trading name",
-            "type": "text",
-            "required": false,
-            "max_length": 160,
-            "help": "Optional. Only if it differs from the firm name."
-          },
-          {
-            "id": "firm_sra_number",
-            "label": "firm SRA number",
-            "type": "text",
-            "required": true,
-            "format": "sra_number",
-            "inputmode": "numeric"
-          },
-          {
-            "id": "firm_type",
-            "label": "type of firm",
-            "type": "select",
-            "required": true,
-            "options": [
-              {
-                "value": "sole_practice",
-                "label": "Sole practice"
-              },
-              {
-                "value": "partnership",
-                "label": "Partnership"
-              },
-              {
-                "value": "llp",
-                "label": "Limited liability partnership (LLP)"
-              },
-              {
-                "value": "limited",
-                "label": "Limited company"
-              }
-            ]
-          },
-          {
-            "id": "firm_company_number",
-            "label": "company number",
-            "type": "text",
-            "required": true,
-            "format": "company_number",
-            "show_if": {
-              "field": "firm_type",
-              "in": [
-                "llp",
-                "limited"
-              ]
-            }
-          },
-          {
-            "id": "firm_office",
-            "label": "Office address",
-            "type": "address",
-            "required": true
-          },
-          {
-            "id": "firm_correspondence_same",
-            "label": "Send post to the office address",
-            "type": "checkbox",
-            "required": false,
-            "default": true
-          },
-          {
-            "id": "firm_correspondence",
-            "label": "Correspondence address",
-            "type": "address",
-            "required": true,
-            "show_if": {
-              "field": "firm_correspondence_same",
-              "equals": false
-            }
-          },
-          {
-            "id": "firm_website",
-            "label": "website",
-            "type": "text",
-            "required": false,
-            "format": "url",
-            "autocomplete": "url",
-            "max_length": 200,
-            "help": "Optional."
-          }
-        ],
+        "id": "practice",
+        "title": "Your practice",
         "profile": true,
-        "scope": "firm"
+        "scope": "firm",
+        "kind": "types",
+        "intro": "",
+        "fields": []
       },
       {
         "id": "signin",
@@ -331,6 +260,677 @@
         "title_when": {
           "payment": "Payment and confirm"
         }
+      }
+    ],
+    "types": [
+      {
+        "id": "sole_practice",
+        "label": "Solicitor: sole practice",
+        "portal": "practice",
+        "regulator": "sra",
+        "legal_form": "sole",
+        "regulator_number_field": "sra_number",
+        "intro": "A practice authorised by the SRA with one solicitor as its principal, in your own name or a trading name.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "name of the practice",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "organization",
+            "help": "As it appears on the SRA register. This is often your own name."
+          },
+          {
+            "id": "trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if you trade under a different name."
+          },
+          {
+            "id": "sra_number",
+            "label": "firm SRA number",
+            "type": "text",
+            "required": true,
+            "format": "sra_number",
+            "inputmode": "numeric",
+            "help": "The number your firm is authorised under, as shown on the SRA register."
+          },
+          {
+            "id": "office",
+            "label": "Office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
+      },
+      {
+        "id": "partnership",
+        "label": "Solicitors: partnership",
+        "portal": "practice",
+        "regulator": "sra",
+        "legal_form": "partnership",
+        "regulator_number_field": "sra_number",
+        "intro": "A firm authorised by the SRA and owned by two or more partners.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "name of the partnership",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "organization",
+            "help": "As it appears on the SRA register."
+          },
+          {
+            "id": "trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if you trade under a different name."
+          },
+          {
+            "id": "sra_number",
+            "label": "firm SRA number",
+            "type": "text",
+            "required": true,
+            "format": "sra_number",
+            "inputmode": "numeric",
+            "help": "The number your firm is authorised under, as shown on the SRA register."
+          },
+          {
+            "id": "principals",
+            "label": "partners",
+            "type": "text",
+            "required": true,
+            "max_length": 600,
+            "help": "The partners' names, separated by commas."
+          },
+          {
+            "id": "licensed_body",
+            "label": "We are a licensed body (an alternative business structure)",
+            "type": "checkbox",
+            "required": false
+          },
+          {
+            "id": "office",
+            "label": "Office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
+      },
+      {
+        "id": "llp",
+        "label": "Solicitors: limited liability partnership (LLP)",
+        "portal": "practice",
+        "regulator": "sra",
+        "legal_form": "llp",
+        "regulator_number_field": "sra_number",
+        "intro": "A firm authorised by the SRA and registered at Companies House as an LLP.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "registered name of the LLP",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "organization",
+            "help": "Exactly as registered at Companies House."
+          },
+          {
+            "id": "trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if you trade under a different name."
+          },
+          {
+            "id": "company_number",
+            "label": "LLP number",
+            "type": "text",
+            "required": true,
+            "format": "company_number",
+            "help": "The number on the Companies House register. It usually starts with OC."
+          },
+          {
+            "id": "sra_number",
+            "label": "firm SRA number",
+            "type": "text",
+            "required": true,
+            "format": "sra_number",
+            "inputmode": "numeric",
+            "help": "The number your firm is authorised under, as shown on the SRA register."
+          },
+          {
+            "id": "principals",
+            "label": "designated members",
+            "type": "text",
+            "required": true,
+            "max_length": 600,
+            "help": "The designated members' names, separated by commas."
+          },
+          {
+            "id": "licensed_body",
+            "label": "We are a licensed body (an alternative business structure)",
+            "type": "checkbox",
+            "required": false
+          },
+          {
+            "id": "office",
+            "label": "Registered office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
+      },
+      {
+        "id": "company",
+        "label": "Solicitors: limited company",
+        "portal": "practice",
+        "regulator": "sra",
+        "legal_form": "company",
+        "regulator_number_field": "sra_number",
+        "intro": "A firm authorised by the SRA and registered at Companies House as a company. A solicitor who practises through their own company signs up here, not as a sole practice.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "registered company name",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "organization",
+            "help": "Exactly as registered at Companies House."
+          },
+          {
+            "id": "trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if you trade under a different name."
+          },
+          {
+            "id": "company_number",
+            "label": "company number",
+            "type": "text",
+            "required": true,
+            "format": "company_number",
+            "help": "The number on the Companies House register."
+          },
+          {
+            "id": "sra_number",
+            "label": "firm SRA number",
+            "type": "text",
+            "required": true,
+            "format": "sra_number",
+            "inputmode": "numeric",
+            "help": "The number your firm is authorised under, as shown on the SRA register."
+          },
+          {
+            "id": "principals",
+            "label": "directors",
+            "type": "text",
+            "required": true,
+            "max_length": 600,
+            "help": "The directors' names, separated by commas."
+          },
+          {
+            "id": "licensed_body",
+            "label": "We are a licensed body (an alternative business structure)",
+            "type": "checkbox",
+            "required": false
+          },
+          {
+            "id": "office",
+            "label": "Registered office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
+      },
+      {
+        "id": "freelance_solicitor",
+        "label": "Solicitor: freelance",
+        "portal": "practice",
+        "regulator": "sra",
+        "legal_form": "individual",
+        "regulator_number_field": "sra_number",
+        "intro": "A self-employed solicitor authorised by the SRA as an individual, practising in your own name, with no trading name, company or staff.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "your name, as you practise",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "name",
+            "help": "A freelance solicitor practises in their own name, so there is no trading name or company to give."
+          },
+          {
+            "id": "sra_number",
+            "label": "your SRA number",
+            "type": "text",
+            "required": true,
+            "format": "sra_number",
+            "inputmode": "numeric",
+            "help": "Your own SRA number. A freelance solicitor has no firm number."
+          },
+          {
+            "id": "reserved_work",
+            "label": "do you provide reserved legal services",
+            "type": "radio",
+            "required": true,
+            "help": "Such as conducting litigation or appearing in court.",
+            "options": [
+              {
+                "value": "yes",
+                "label": "Yes"
+              },
+              {
+                "value": "no",
+                "label": "No"
+              }
+            ]
+          },
+          {
+            "id": "insured",
+            "label": "do you have professional indemnity insurance",
+            "type": "radio",
+            "required": true,
+            "help": "The SRA expects adequate and appropriate cover for a freelance solicitor who provides reserved services.",
+            "options": [
+              {
+                "value": "yes",
+                "label": "Yes"
+              },
+              {
+                "value": "no",
+                "label": "No"
+              }
+            ]
+          },
+          {
+            "id": "office",
+            "label": "Practising address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
+      },
+      {
+        "id": "costs_lawyer",
+        "label": "Costs Lawyer",
+        "portal": "costs",
+        "regulator": "clsb",
+        "legal_form_field": "legal_form",
+        "regulator_number_field": "cl_number",
+        "intro": "A Costs Lawyer regulated by the Costs Lawyer Standards Board, working alone or in a costs business. The Board regulates you as an individual, not the business.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "name of the business, or your own name",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "organization",
+            "help": "The name you invoice under."
+          },
+          {
+            "id": "trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if you trade under a different name."
+          },
+          {
+            "id": "legal_form",
+            "label": "how the business is set up",
+            "type": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "sole",
+                "label": "Just me (sole trader)"
+              },
+              {
+                "value": "partnership",
+                "label": "Partnership"
+              },
+              {
+                "value": "llp",
+                "label": "Limited liability partnership (LLP)"
+              },
+              {
+                "value": "company",
+                "label": "Limited company"
+              }
+            ]
+          },
+          {
+            "id": "company_number",
+            "label": "company number",
+            "type": "text",
+            "required": true,
+            "format": "company_number",
+            "help": "The number on the Companies House register.",
+            "show_if": {
+              "field": "legal_form",
+              "in": [
+                "llp",
+                "company"
+              ]
+            }
+          },
+          {
+            "id": "cl_number",
+            "label": "your Costs Lawyer number",
+            "type": "text",
+            "required": true,
+            "format": "cl_number",
+            "help": "Your number on the Register of Costs Lawyers. It starts with CL."
+          },
+          {
+            "id": "other_costs_lawyers",
+            "label": "other Costs Lawyers in the business",
+            "type": "text",
+            "required": false,
+            "max_length": 600,
+            "help": "Optional. Their names and CL numbers, separated by commas."
+          },
+          {
+            "id": "instructed_by",
+            "label": "who instructs you",
+            "type": "radio",
+            "required": true,
+            "options": [
+              {
+                "value": "firms",
+                "label": "Solicitors' firms and other legal professionals"
+              },
+              {
+                "value": "clients",
+                "label": "Clients directly"
+              },
+              {
+                "value": "both",
+                "label": "Both"
+              }
+            ]
+          },
+          {
+            "id": "insured",
+            "label": "do you have the professional indemnity insurance the Board requires",
+            "type": "radio",
+            "required": true,
+            "help": "The Practising Rules set a minimum level of cover, including loss of documents.",
+            "options": [
+              {
+                "value": "yes",
+                "label": "Yes"
+              },
+              {
+                "value": "no",
+                "label": "No"
+              }
+            ]
+          },
+          {
+            "id": "office",
+            "label": "Office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
+      },
+      {
+        "id": "costs_draftsman",
+        "label": "Costs draftsman",
+        "portal": "costs",
+        "regulator": "none",
+        "legal_form_field": "legal_form",
+        "regulator_number_field": null,
+        "intro": "A costs draftsman or costs adviser who is not regulated by the Costs Lawyer Standards Board or the SRA.",
+        "fields": [
+          {
+            "id": "account_name",
+            "label": "name of the business, or your own name",
+            "type": "text",
+            "required": true,
+            "max_length": 160,
+            "autocomplete": "organization",
+            "help": "The name you invoice under."
+          },
+          {
+            "id": "trading_name",
+            "label": "trading name",
+            "type": "text",
+            "required": false,
+            "max_length": 160,
+            "help": "Optional. Only if you trade under a different name."
+          },
+          {
+            "id": "legal_form",
+            "label": "how the business is set up",
+            "type": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "sole",
+                "label": "Just me (sole trader)"
+              },
+              {
+                "value": "partnership",
+                "label": "Partnership"
+              },
+              {
+                "value": "llp",
+                "label": "Limited liability partnership (LLP)"
+              },
+              {
+                "value": "company",
+                "label": "Limited company"
+              }
+            ]
+          },
+          {
+            "id": "company_number",
+            "label": "company number",
+            "type": "text",
+            "required": true,
+            "format": "company_number",
+            "help": "The number on the Companies House register.",
+            "show_if": {
+              "field": "legal_form",
+              "in": [
+                "llp",
+                "company"
+              ]
+            }
+          },
+          {
+            "id": "instructed_by",
+            "label": "who instructs you",
+            "type": "radio",
+            "required": true,
+            "options": [
+              {
+                "value": "firms",
+                "label": "Solicitors' firms and other legal professionals"
+              },
+              {
+                "value": "clients",
+                "label": "Clients directly"
+              },
+              {
+                "value": "both",
+                "label": "Both"
+              }
+            ]
+          },
+          {
+            "id": "supervised_by",
+            "label": "who supervises your work",
+            "type": "text",
+            "required": false,
+            "max_length": 200,
+            "help": "Optional. A regulated lawyer or firm that supervises your work, if there is one."
+          },
+          {
+            "id": "insured",
+            "label": "do you have professional indemnity insurance",
+            "type": "radio",
+            "required": true,
+            "help": "Not a regulatory requirement for you, but the firms that instruct you may ask.",
+            "options": [
+              {
+                "value": "yes",
+                "label": "Yes"
+              },
+              {
+                "value": "no",
+                "label": "No"
+              }
+            ]
+          },
+          {
+            "id": "office",
+            "label": "Office address",
+            "type": "address",
+            "required": true
+          },
+          {
+            "id": "website",
+            "label": "website",
+            "type": "text",
+            "required": false,
+            "format": "url",
+            "autocomplete": "url",
+            "max_length": 200,
+            "help": "Optional."
+          },
+          {
+            "id": "ico_number",
+            "label": "ICO registration number",
+            "type": "text",
+            "required": false,
+            "format": "ico_number",
+            "help": "Optional. Your data protection registration with the Information Commissioner's Office, if you have one."
+          }
+        ]
       }
     ]
   },

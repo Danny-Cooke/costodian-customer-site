@@ -23,6 +23,9 @@
         {% for f in step.fields %}
         {{ ui.field(f) }}
         {% endfor %}
+        {% if step.kind == 'types' %}
+        {{ ui.account_types(forms.signup.types) }}
+        {% endif %}
       </section>
       {% endfor %}
       <p class="actions"><button type="submit" class="button large">Save your details</button></p>

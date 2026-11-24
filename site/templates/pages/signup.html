@@ -26,6 +26,9 @@
         {% for f in step.fields %}
         {{ ui.field(f) }}
         {% endfor %}
+        {% if step.kind == 'types' %}
+        {{ ui.account_types(forms.signup.types) }}
+        {% endif %}
         <p class="actions">
           {% if not loop.first %}<button type="button" class="button quiet" data-back>Back</button>{% endif %}
           {% if loop.last %}
