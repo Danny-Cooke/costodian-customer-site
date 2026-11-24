@@ -517,8 +517,12 @@ data "aws_iam_policy_document" "boundary" {
 }
 
 resource "aws_iam_policy" "boundary" {
-  name        = module.naming.names["boundary"]
-  description = "Permissions boundary every ${local.account_prefix} and ${local.customer_prefix} role must carry"
+  name = module.naming.names["boundary"]
+  # A managed policy's description cannot be changed once it is made: a new
+  # wording replaces the policy, and a boundary that roles carry cannot be
+  # deleted. So this text stays as first written, though the boundary now
+  # covers the customer data role as well as the function roles.
+  description = "Permissions boundary every ${local.account_prefix} function role must carry"
   policy      = data.aws_iam_policy_document.boundary.json
 
   tags = merge(local.tags, { Name = module.naming.names["boundary"] })
