@@ -32,6 +32,14 @@ PLATFORM_FILE_VARIABLE = "PLATFORM_FILE"
 DEFAULT_PLATFORM_FILE = ROOT / "infra" / "envs" / "dev" / "platform.tfvars.json"
 PRODUCT_NAME_KEY = "product_name"
 INITIAL_VERSIONS_KEY = "initial_versions"
+# What a kind of account may leave out of its definition in forms.json.
+TYPE_DEFAULTS: dict[str, Any] = {
+    "intro": "",
+    "legal_form": None,
+    "legal_form_field": None,
+    "regulator_number_field": None,
+}
+TYPE_KEYS = ("id", "label", "portal", "regulator", "legal_form", "legal_form_field", "regulator_number_field", "groups")
 STATIC_URL = "/static"
 INDEX = "index.html"
 PAGE_DATA_ID = "page-data"
@@ -205,10 +213,21 @@ def with_condition(fields: list[Field], condition: dict[str, Any] | None) -> lis
 
 
 def build_forms(forms: dict[str, Any], site: dict[str, Any]) -> dict[str, Any]:
+    # Each kind of account has a set of questions of its own. They are kept
+    # apart, not merged into one form with parts hidden, so that a question only
+    # exists for the kinds of account it is asked of.
+    types = []
+    for kind in forms["signup"]["types"]:
+        tree, flat, groups = expand(prepare(kind["fields"], site), forms)
+        types.append({**TYPE_DEFAULTS, **kind, "fields": tree, "flat": flat, "groups": groups})
+
     signup_steps = []
     for step in prepare(forms["signup"]["steps"], site):
+        for field in step["fields"]:
+            if field.pop("options_from_types", False):
+                field["options"] = [{"value": kind["id"], "label": kind["label"]} for kind in types]
         tree, flat, groups = expand(step["fields"], forms)
-        signup_steps.append({"profile": False, **step, "fields": tree, "flat": flat, "groups": groups})
+        signup_steps.append({"profile": False, "kind": "", **step, "fields": tree, "flat": flat, "groups": groups})
 
     def simple(fields: list[Field]) -> dict[str, list[Field]]:
         tree, flat, _ = expand(prepare(fields, site), forms)
@@ -243,7 +262,7 @@ def build_forms(forms: dict[str, Any], site: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "messages": forms["messages"],
-        "signup": {"steps": signup_steps},
+        "signup": {"steps": signup_steps, "types": types},
         "verify": simple(forms["verify"]["fields"]),
         "signin": simple(forms["signin"]["fields"]),
         "reset": {"request": simple(forms["reset"]["request"]), "confirm": simple(forms["reset"]["confirm"])},
@@ -289,15 +308,18 @@ def page_data(page: dict[str, Any], site: dict[str, Any], forms: dict[str, Any])
     }
     scripts = page.get("scripts", [])
     steps = [
-        {key: step[key] for key in ("id", "title", "profile", "groups")}
+        {key: step[key] for key in ("id", "title", "profile", "groups", "kind")}
         | {"fields": step["flat"], "scope": step.get("scope", "")}
         for step in forms["signup"]["steps"]
     ]
+    types = [{key: kind[key] for key in TYPE_KEYS} | {"fields": kind["flat"]} for kind in forms["signup"]["types"]]
     if "signup" in scripts:
         data["steps"] = steps
+        data["types"] = types
         data["verifyFields"] = forms["verify"]["flat"]
     if "details" in scripts:
         data["steps"] = [step for step in steps if step["profile"]]
+        data["types"] = types
     if "signin" in scripts:
         data["signinFields"] = forms["signin"]["flat"]
         data["verifyFields"] = forms["verify"]["flat"]

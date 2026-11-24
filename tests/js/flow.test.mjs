@@ -9,85 +9,130 @@ const YOU = {
   person_email: "sam@example.test",
   person_phone: "020 7946 0000",
 };
-const FIRM = {
-  firm_name: "Example Law LLP",
-  firm_sra_number: "123456",
-  firm_type: "partnership",
-  firm_office_line1: "1 High Street",
-  firm_office_town: "London",
-  firm_office_postcode: "SE1 1AA",
+const KIND = "partnership";
+const PRACTICE = {
+  account_name: "Example Law",
+  sra_number: "123456",
+  principals: "Sam Example, Alex Example",
+  office_line1: "1 High Street",
+  office_town: "London",
+  office_postcode: "SE1 1AA",
 };
-const SIGNED_UP = { signup: { values: { ...YOU, ...FIRM }, completedAt: "2026-11-17T10:00:00.000Z" } };
+const SIGNED_UP = {
+  signup: { values: { ...YOU, account_type: KIND, ...PRACTICE }, completedAt: "2026-11-17T10:00:00.000Z" },
+};
 const visibleStep = (page) => page.all("[data-step]").filter((step) => !step.hidden).map((step) => step.dataset.step);
 const fill = (page, values, root) => Object.entries(values).forEach(([id, value]) => page.set(id, value, root));
+// The block of questions for one kind of account, and the kinds whose block is on show.
+const block = (page, kind) => page.one(`[data-type="${kind}"]`);
+const shownKinds = (page) => page.all("[data-type]").filter((kind) => !kind.hidden).map((kind) => kind.dataset.type);
+const asked = (page, kind) => [...block(page, kind).querySelectorAll("[data-input]")].map((input) => input.dataset.input);
+const KINDS = ["sole_practice", "partnership", "llp", "company", "freelance_solicitor", "costs_lawyer", "costs_draftsman"];
+
+// Chooses the kind of account and answers the questions about the person.
+function reachPractice(page, kind = KIND) {
+  page.set("account_type", kind);
+  page.submit();
+  fill(page, YOU);
+  page.submit();
+}
 
 // ------------------------------------------------------------------ sign-up
 
-test("sign-up starts on the first step and will not move on while it is incomplete", async () => {
+test("sign-up starts by asking the kind of account and will not move on without one", async () => {
   const page = await open("signup");
+  assert.deepEqual(visibleStep(page), ["type"]);
+  assert.deepEqual(
+    [...page.one('[data-input="account_type"]').options].map((option) => option.value).filter(Boolean),
+    KINDS,
+  );
+
+  page.submit();
+  assert.deepEqual(visibleStep(page), ["type"]);
+  assert.equal(page.one("[data-summary]").hidden, false);
+  assert.equal(page.error("account_type"), "Choose account type");
+  assert.deepEqual(page.state(), {}, "nothing is kept from a step that failed");
+});
+
+test("the questions about the person are checked before the practice is asked about", async () => {
+  const page = await open("signup");
+  page.set("account_type", KIND);
+  page.submit();
   assert.deepEqual(visibleStep(page), ["you"]);
 
   page.submit();
   assert.deepEqual(visibleStep(page), ["you"]);
-  assert.equal(page.one("[data-summary]").hidden, false);
   assert.equal(page.error("person_name"), "Enter full name");
-  assert.equal(page.error("person_role"), "Choose role at the firm");
   assert.equal(page.error("person_sra_number"), "", "an optional field is not reported");
   assert.equal(page.one('[data-input="person_name"]').getAttribute("aria-invalid"), "true");
-  assert.deepEqual(page.state(), {}, "nothing is kept from a step that failed");
-});
 
-test("a wrong email address is refused with the format message", async () => {
-  const page = await open("signup");
   fill(page, { ...YOU, person_email: "sam-at-example" });
   page.submit();
   assert.deepEqual(visibleStep(page), ["you"]);
   assert.match(page.error("person_email"), /name@example\.com/);
 });
 
-test("the company number is asked for only when the firm is a company or an LLP", async () => {
-  const page = await open("signup");
-  assert.equal(page.field("firm_company_number").hidden, true);
-  page.set("firm_type", "llp");
-  assert.equal(page.field("firm_company_number").hidden, false);
-  page.set("firm_type", "sole_practice");
-  assert.equal(page.field("firm_company_number").hidden, true);
+test("each kind of account is shown its own questions and nobody else's", async () => {
+  for (const kind of KINDS) {
+    const page = await open("signup");
+    reachPractice(page, kind);
+    assert.deepEqual(visibleStep(page), ["practice"], kind);
+    assert.deepEqual(shownKinds(page), [kind], kind);
+  }
 });
 
-test("a separate correspondence address appears, and is required, only when the box is unticked", async () => {
+test("what only some kinds have is asked only of them", async () => {
   const page = await open("signup");
-  fill(page, YOU);
-  page.submit();
-  assert.deepEqual(visibleStep(page), ["firm"]);
-  assert.equal(page.field("firm_correspondence").hidden, true);
+  assert.ok(!asked(page, "freelance_solicitor").includes("trading_name"), "a freelance solicitor has no trading name");
+  for (const kind of ["sole_practice", "partnership", "freelance_solicitor"]) {
+    assert.ok(!asked(page, kind).includes("company_number"), `${kind} has no company number`);
+  }
+  for (const kind of ["llp", "company"]) assert.ok(asked(page, kind).includes("company_number"), kind);
+  assert.ok(asked(page, "costs_lawyer").includes("cl_number"));
+  assert.ok(!asked(page, "costs_draftsman").includes("cl_number"));
+  for (const kind of ["costs_lawyer", "costs_draftsman"]) assert.ok(!asked(page, kind).includes("sra_number"), kind);
+});
 
-  fill(page, FIRM);
-  page.set("firm_correspondence_same", false);
-  assert.equal(page.field("firm_correspondence").hidden, false);
-  page.submit();
-  assert.deepEqual(visibleStep(page), ["firm"]);
-  assert.equal(page.error("firm_correspondence_line1"), "Enter address line 1");
-  assert.equal(page.error("firm_correspondence_line2"), "", "the second line is optional");
+test("a costs business is asked for a company number only if it is a company or an LLP", async () => {
+  const page = await open("signup");
+  reachPractice(page, "costs_draftsman");
+  const mine = block(page, "costs_draftsman");
+  assert.equal(page.field("company_number", mine).hidden, true);
+  page.set("legal_form", "llp", mine);
+  assert.equal(page.field("company_number", mine).hidden, false);
+  page.set("legal_form", "sole", mine);
+  assert.equal(page.field("company_number", mine).hidden, true);
+});
 
-  page.set("firm_correspondence_same", true);
+test("the practice's own questions are checked, and only that kind's", async () => {
+  const page = await open("signup");
+  reachPractice(page);
   page.submit();
-  assert.deepEqual(visibleStep(page), ["confirm"]);
+  assert.deepEqual(visibleStep(page), ["practice"]);
+  assert.equal(page.error("account_name", block(page, KIND)), "Enter name of the partnership");
+  assert.equal(page.error("principals", block(page, KIND)), "Enter partners");
+  assert.equal(page.error("office_line2", block(page, KIND)), "", "the second address line is optional");
+  assert.equal(page.error("cl_number", block(page, "costs_lawyer")), "", "another kind's questions are not checked");
 });
 
 test("the whole sign-up: review, confirm, saved, and on to the portal", async () => {
   const page = await open("signup");
-  fill(page, YOU);
-  page.submit();
-  fill(page, { ...FIRM, firm_type: "llp", firm_company_number: "OC123456" });
-  page.set("firm_type", "partnership");
+  // Answers given as one kind are left behind when another kind is chosen instead.
+  reachPractice(page, "llp");
+  fill(page, { account_name: "Wrong LLP", company_number: "OC123456" }, block(page, "llp"));
+  page.click(page.one('[data-step="practice"] [data-back]'));
+  page.click(page.one('[data-step="you"] [data-back]'));
+  reachPractice(page, KIND);
+  fill(page, PRACTICE, block(page, KIND));
   page.submit();
   assert.deepEqual(visibleStep(page), ["confirm"]);
 
   const review = page.one("[data-review]").textContent;
   assert.match(review, /Sam Example/);
   assert.match(review, /Partner or director/, "a choice is shown by its wording, not its code");
-  assert.match(review, /Example Law LLP/);
-  assert.doesNotMatch(review, /OC123456/, "a field that is no longer on show is not reviewed");
+  assert.match(review, /Solicitors: partnership/);
+  assert.match(review, /Example Law/);
+  assert.doesNotMatch(review, /OC123456|Wrong LLP/, "another kind's answers are not reviewed");
   assert.equal(page.one('[data-progress-step="confirm"]').getAttribute("aria-current"), "step");
 
   page.submit();
@@ -100,28 +145,33 @@ test("the whole sign-up: review, confirm, saved, and on to the portal", async ()
   const saved = page.state();
   assert.ok(saved.signup.completedAt);
   assert.equal(saved.signup.values.person_email, YOU.person_email);
-  assert.equal(saved.signup.values.firm_type, "partnership");
-  assert.equal("firm_company_number" in saved.signup.values, false, "a hidden field's value is not kept");
-  assert.equal("firm_correspondence_line1" in saved.signup.values, false);
+  assert.equal(saved.signup.values.account_type, KIND);
+  assert.equal(saved.signup.values.account_name, PRACTICE.account_name);
+  assert.equal("company_number" in saved.signup.values, false, "another kind's answers are not kept");
   assert.equal("signupDraft" in saved, false);
 });
 
 test("back returns to the previous step with the entries still there", async () => {
   const page = await open("signup");
-  fill(page, YOU);
-  page.submit();
-  page.click(page.one('[data-step="firm"] [data-back]'));
+  reachPractice(page);
+  page.click(page.one('[data-step="practice"] [data-back]'));
   assert.deepEqual(visibleStep(page), ["you"]);
   assert.equal(page.one('[data-input="person_name"]').value, YOU.person_name);
 });
 
-test("a half-finished sign-up is offered again in the same tab", async () => {
+test("a half-finished sign-up is offered again in the same tab, with its kind of account", async () => {
   const first = await open("signup");
-  fill(first, YOU);
+  reachPractice(first, "costs_lawyer");
+  fill(first, { account_name: "Example Costs", cl_number: "CL1234" }, block(first, "costs_lawyer"));
   first.submit();
+  first.click(first.one('[data-step="practice"] [data-back]'));
+  first.submit();
+
   const again = await open("signup", first.storage);
   assert.equal(again.one('[data-input="person_email"]').value, YOU.person_email);
-  assert.deepEqual(visibleStep(again), ["you"]);
+  assert.equal(again.one('[data-input="account_type"]').value, "costs_lawyer");
+  assert.equal(block(again, "costs_lawyer").querySelector('[data-input="account_name"]').value, "Example Costs");
+  assert.deepEqual(visibleStep(again), ["type"]);
 });
 
 // ------------------------------------------------------------------- portal
@@ -137,7 +187,7 @@ test("the portal shows who is signed in, and sign out forgets everything", async
   const page = await open("portal", storageWith(SIGNED_UP));
   assert.deepEqual(page.visited, []);
   assert.equal(page.one("[data-user-name]").textContent, YOU.person_name);
-  assert.equal(page.one("[data-firm-name]").textContent, FIRM.firm_name);
+  assert.equal(page.one("[data-firm-name]").textContent, PRACTICE.account_name);
 
   page.click(page.one("[data-sign-out]"));
   assert.deepEqual(page.state(), {});

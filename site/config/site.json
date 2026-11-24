@@ -228,9 +228,11 @@
   },
   "identity": {
     "person_name_field": "person_name",
-    "firm_name_field": "firm_name",
+    "firm_name_field": "account_name",
     "person_email_field": "person_email",
-    "password_field": "person_password"
+    "password_field": "person_password",
+    "account_type_field": "account_type",
+    "trading_name_field": "trading_name"
   },
   "retention": {
     "years": 7,
@@ -299,10 +301,26 @@
     "left": "left"
   },
   "customer_label": {
-    "name": "firm_name",
-    "company_number": "firm_company_number",
-    "sra_number": "firm_sra_number",
-    "version": "product_version"
+    "name": "name",
+    "trading_name": "trading_name",
+    "slug": "slug",
+    "account_type": "type",
+    "portal": "portal",
+    "legal_form": "legal_form",
+    "regulator": "regulator",
+    "regulator_number": "regulator_number",
+    "company_number": "company_number"
   },
-  "version_field": "product_version"
+  "version_field": "product_version",
+  "account": {
+    "slug_max_length": 24,
+    "slug_from": [
+      "trading_name",
+      "account_name"
+    ],
+    "company_number_field": "company_number"
+  },
+  "customer_label_answers": {
+    "version": "product_version"
+  }
 }

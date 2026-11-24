@@ -134,14 +134,6 @@ def tokens() -> Any:
     return boto3.client("sts")
 
 
-@cache
-def legacy() -> Any:
-    """The one table every firm shared before each had its own. Read to move firms out of it."""
-    import boto3
-
-    return boto3.resource("dynamodb").Table(os.environ["LEGACY_TABLE_NAME"])
-
-
 def for_customer(template_variable: str, number: str) -> str:
     return os.environ[template_variable].replace(NUMBER_PLACEHOLDER, number)
 
@@ -326,12 +318,13 @@ def describe(number: str, table: Any, items: dict[str, Any] | None = None) -> No
     """Brings the customer's label up to date with what the firm has saved."""
     statuses = config()["customerStatuses"]
     shared = items if items is not None else everything_under(table, names()["firm_partition"])
-    answers = {
-        **shared.get(names()["firm"], {}).get("values", {}),
-        **shared.get(names()["company"], {}).get("values", {}),
-    }
+    account = shared.get(names()["firm"], {}).get("account", {})
+    answers = shared.get(names()["company"], {}).get("values", {})
     done = all(sort in shared for sort in (names()["firm"], names()["company"], agreement_key()))
-    label = {name: answers.get(field) or None for name, field in config()["customerLabel"].items()}
+    label = {
+        **{name: account.get(field) or None for name, field in config()["customerLabel"].items()},
+        **{name: answers.get(field) or None for name, field in config()["customerLabelAnswers"].items()},
+    }
     write_label(number, status=statuses["complete"] if done else statuses["signed_up"], **label)
 
 
@@ -427,32 +420,84 @@ def checked(fields: list[dict[str, Any]], values: dict[str, Any]) -> dict[str, A
 # ------------------------------------------------------------------- sections
 
 
-def profile_fields(scope: str | None = None) -> list[dict[str, Any]]:
-    """The fields of the sign-up steps that describe the person and the firm."""
+def person_fields() -> list[dict[str, Any]]:
+    """The questions about the person signing up, whatever kind of account it is."""
     return [
         field
         for step in config()["signup"]["steps"]
-        if step["profile"] and scope in (None, step["scope"])
+        if step["profile"] and step["scope"] == "person"
         for field in step["fields"]
     ]
 
 
-def split_profile(values: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """(the person's own details, the firm's details)."""
-    own = {field["id"] for field in profile_fields("person")}
-    return (
-        {name: value for name, value in values.items() if name in own},
-        {name: value for name, value in values.items() if name not in own},
-    )
+def account_type_field() -> dict[str, Any]:
+    wanted = config()["identity"]["account_type_field"]
+    return next(field for step in config()["signup"]["steps"] for field in step["fields"] if field["id"] == wanted)
+
+
+def kind_of(values: dict[str, Any]) -> dict[str, Any]:
+    """The kind of account chosen, with its own questions. Refuses a kind that is not one of ours."""
+    field = account_type_field()
+    chosen = values.get(field["id"])
+    for kind in config()["signup"]["types"]:
+        if kind["id"] == chosen:
+            found: dict[str, Any] = kind
+            return found
+    raise Refused(422, {"error": "invalid", "errors": {field["id"]: config()["messages"]["account_type_unknown"]}})
+
+
+def slug_of(name: str) -> str | None:
+    """A name cut down to what is safe inside the name of a resource: a-z, 0-9 and hyphens."""
+    limit = config()["account"]["slug_max_length"]
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:limit].strip("-")
+    return slug or None
+
+
+def account_of(kind: dict[str, Any], answers: dict[str, Any]) -> dict[str, Any]:
+    """The same few facts about every customer, whichever sign-up they came through.
+
+    A registered company name, an LLP's name, a partnership's name and a
+    draftsman's own name all become `name`. Whatever creates the customer's
+    account reads these and never needs to know which questions were asked.
+    """
+    identity = config()["identity"]
+    settings = config()["account"]
+    name = answers.get(identity["firm_name_field"])
+    trading = answers.get(identity["trading_name_field"]) or None
+    spoken = next((answers[field] for field in settings["slug_from"] if answers.get(field)), "")
+    number_field = kind["regulator_number_field"]
+    number = answers.get(number_field) if number_field else None
+    return {
+        "type": kind["id"],
+        "portal": kind["portal"],
+        "regulator": kind["regulator"],
+        "legal_form": kind["legal_form"] or answers.get(kind["legal_form_field"]),
+        "name": name,
+        "trading_name": trading,
+        "slug": slug_of(spoken),
+        "regulator_number": number.replace(" ", "").upper() if isinstance(number, str) else None,
+        "company_number": answers.get(settings["company_number_field"]) or None,
+    }
 
 
 def save_signup(person: dict[str, str], membership: Membership, body: dict[str, Any]) -> dict[str, Any]:
-    values = checked(profile_fields(), object_of(body, "values"))
-    own, shared = split_profile(values)
+    values = object_of(body, "values")
+    kind = kind_of(values)
+    own_fields = person_fields()
+    shared_fields = [account_type_field(), *kind["fields"]]
+    kept = checked([*own_fields, *shared_fields], values)
+    own_ids = {field["id"] for field in own_fields}
+    own = {name: value for name, value in kept.items() if name in own_ids}
+    shared = {name: value for name, value in kept.items() if name not in own_ids}
     completed = now()
     put(membership.table, person_partition(person["sub"]), names()["person"], {"values": own})
-    put(membership.table, names()["firm_partition"], names()["firm"], {"values": shared, "completedAt": completed})
-    return {"values": values, "completedAt": completed}
+    put(
+        membership.table,
+        names()["firm_partition"],
+        names()["firm"],
+        {"values": shared, "account": account_of(kind, shared), "completedAt": completed},
+    )
+    return {"values": kept, "completedAt": completed}
 
 
 def version_order(version: str) -> tuple[int, ...]:
@@ -561,7 +606,7 @@ def invite(person: dict[str, str], membership: Membership, members: list[dict[st
         raise
     subject = next(a["Value"] for a in created["User"]["Attributes"] if a["Name"] == "sub")
     add_member(membership.table, subject, email, role, person.get("email", ""))
-    email_field = next((field["id"] for field in profile_fields("person") if field["type"] == "email"), None)
+    email_field = next((field["id"] for field in person_fields() if field["type"] == "email"), None)
     if email_field:
         put(membership.table, person_partition(subject), names()["person"], {"values": {email_field: email}})
     record(membership.table, person, "invited", subject=email, role=role)
@@ -622,38 +667,6 @@ def number_on_record(person: dict[str, str]) -> str | None:
     attribute = os.environ["CUSTOMER_ATTRIBUTE"]
     held = next((a["Value"] for a in user.get("UserAttributes", []) if a["Name"] == attribute), None)
     return held if held and CUSTOMER_NUMBER.fullmatch(held) else None
-
-
-def move_in(person: dict[str, str], number: str, table: Any) -> bool:
-    """Moves a firm saved before each customer had a table of its own into this one.
-
-    Returns whether there was one to move.
-    """
-    if not os.environ.get("LEGACY_TABLE_NAME"):
-        return False
-    old = legacy()
-    old_keys = config()["legacyKeys"]
-    account = old_keys["account_prefix"] + person["sub"]
-    own = everything_under(old, account)
-    membership = own.get(old_keys["membership"])
-    if not membership:
-        return False
-
-    firm_partition = old_keys["firm_prefix"] + membership["firmId"]
-    shared = everything_under(old, firm_partition)
-    for sort, data in shared.items():
-        put(table, names()["firm_partition"], sort, data)
-    for member in people_in(shared):
-        theirs = old_keys["account_prefix"] + member["sub"]
-        details = one(old, theirs, old_keys["person"])
-        if details is not None:
-            put(table, person_partition(member["sub"]), names()["person"], details)
-        attach(member["sub"], number)
-        for sort in (old_keys["membership"], old_keys["person"]):
-            remove(old, theirs, sort)
-    for sort in shared:
-        remove(old, firm_partition, sort)
-    return True
 
 
 # ------------------------------------------------------------------- handlers
@@ -730,15 +743,11 @@ def enrol(event: Event) -> dict[str, Any]:
     number, table = claim_a_number(person)
     statuses = config()["customerStatuses"]
     write_label(number, status=statuses["signed_up"], signed_up_on=today().isoformat())
-    if move_in(person, number, table):
-        describe(number, table)
-    else:
-        role = config()["firstMemberRole"]
-        add_member(table, person["sub"], person.get("email", ""), role, person.get("email", ""))
-        attach(person["sub"], number)
-        record(table, person, "created")
-    member = one(table, names()["firm_partition"], names()["member_prefix"] + person["sub"])
-    return {"member": {"role": member["role"]}, "renew": True}
+    role = config()["firstMemberRole"]
+    add_member(table, person["sub"], person.get("email", ""), role, person.get("email", ""))
+    attach(person["sub"], number)
+    record(table, person, "created")
+    return {"member": {"role": role}, "renew": True}
 
 
 @guarded

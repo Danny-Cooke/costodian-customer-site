@@ -14,14 +14,17 @@ const YOU = {
   person_email: "sam@example.test",
   person_phone: "020 7946 0000",
 };
-const FIRM = {
-  firm_name: "Example Law LLP",
-  firm_sra_number: "123456",
-  firm_type: "partnership",
-  firm_office_line1: "1 High Street",
-  firm_office_town: "London",
-  firm_office_postcode: "SE1 1AA",
+const KIND = "partnership";
+const PRACTICE = {
+  account_name: "Example Law",
+  sra_number: "123456",
+  principals: "Sam Example, Alex Example",
+  office_line1: "1 High Street",
+  office_town: "London",
+  office_postcode: "SE1 1AA",
 };
+const FIRM = { account_type: KIND, ...PRACTICE };
+const block = (page, kind) => page.one(`[data-type="${kind}"]`);
 const SIGNUP = { values: { ...YOU, ...FIRM }, completedAt: "2026-11-18T10:00:00.000Z" };
 const TOKENS = { AuthenticationResult: { IdToken: "token-1", RefreshToken: "refresh-1", ExpiresIn: 3600 } };
 const OWNER = { sub: "sub-owner", email: YOU.person_email, role: "owner", addedBy: YOU.person_email, addedAt: "2026-11-18T10:00:00.000Z" };
@@ -49,9 +52,11 @@ const network = (answers) =>
   fakeNetwork((request) => answers[request.target || `${request.method} ${request.url}`]?.(request) ?? { status: 500 });
 
 async function reachConfirm(page) {
+  page.set("account_type", KIND);
+  page.submit();
   fill(page, YOU);
   page.submit();
-  fill(page, FIRM);
+  Object.entries(PRACTICE).forEach(([id, value]) => page.set(id, value, block(page, KIND)));
   page.submit();
   assert.deepEqual(visibleStep(page), ["signin"]);
 }
@@ -203,24 +208,35 @@ test("your details are filled from the account and saved back to it", async () =
     [`PUT ${data.api.account}/signup`]: (request) => ({ body: { signup: { ...request.body, completedAt: SIGNUP.completedAt } } }),
   });
   const page = await openLive("details", sessionWith(memoryStorage()), net);
-  assert.equal(page.one('[data-input="firm_name"]').value, FIRM.firm_name);
+  assert.equal(page.one('[data-input="account_type"]').value, KIND);
+  assert.deepEqual(
+    page.all("[data-type]").filter((kind) => !kind.hidden).map((kind) => kind.dataset.type),
+    [KIND],
+    "only the questions for this firm's kind of account are on show",
+  );
+  assert.equal(block(page, KIND).querySelector('[data-input="account_name"]').value, PRACTICE.account_name);
 
   page.set("person_phone", "020 7946 0999");
+  page.set("principals", "Sam Example, Alex Example, Jo Example", block(page, KIND));
   page.submit();
   await settle();
-  assert.equal(net.requests.at(-1).body.values.person_phone, "020 7946 0999");
+  const sent = net.requests.at(-1).body.values;
+  assert.equal(sent.person_phone, "020 7946 0999");
+  assert.equal(sent.principals, "Sam Example, Alex Example, Jo Example");
+  assert.equal(sent.account_type, KIND);
+  assert.equal("cl_number" in sent, false, "another kind's questions are not sent");
   assert.equal(page.one("[data-saved]").hidden, false);
 });
 
 test("what the API refuses is shown, and the page does not claim it was saved", async () => {
   const net = network({
     [`GET ${data.api.account}`]: () => accountOf(OWNER),
-    [`PUT ${data.api.account}/signup`]: () => ({ status: 422, body: { errors: { firm_name: "Enter firm name" } } }),
+    [`PUT ${data.api.account}/signup`]: () => ({ status: 422, body: { errors: { account_name: "Enter name of the partnership" } } }),
   });
   const page = await openLive("details", sessionWith(memoryStorage()), net);
   page.submit();
   await settle();
-  assert.match(page.one("[data-summary]").textContent, /Enter firm name/);
+  assert.match(page.one("[data-summary]").textContent, /Enter name of the partnership/);
   assert.equal(page.one("[data-saved]").hidden, true);
 });
 

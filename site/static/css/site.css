@@ -897,3 +897,9 @@ input.short {
 .roles dd {
   margin: 0 0 0.75rem;
 }
+
+/* The questions for one kind of account. */
+.account-type-name {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
