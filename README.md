@@ -14,9 +14,11 @@ be clicked through. There is no API, no database, no sign-in and no payment yet.
 | Page | What it does |
 |---|---|
 | Home, How it works, Security and compliance, Pricing | The public site, for legally aided and privately funded work. Security and compliance maps each feature to the SRA duty it answers |
-| Sign up | Three steps: about you, your firm, payment (placeholder) and confirm |
-| Portal: Set-up | The checklist a firm sees after signing up |
-| Portal: Company information | Billing set-up, funding types, fee earners, the firm's positions on the legal aid rules that leave a choice, and private client charging |
+| Sign up | About you, your firm, your sign-in, and confirm. No payment yet. |
+| Portal: My account | The checklist a firm sees after signing up |
+| Portal: Your details | The person's and the firm's details |
+| Portal: Company information | Funding types, billing set-up and the version the firm runs. How a firm charges its own clients is set up in the product, not here. |
+| Portal: People | Owners and administrators, invitations and the change record |
 | Portal: Agreements | The data processing agreement (draft text) and its acceptance |
 
 The order is deliberate: sign up and pay first; company information and the
@@ -28,12 +30,10 @@ both are done.
 ```
 site/config/site.json    every value the pages show: names, routes, pages, price
 site/config/forms.json   every form field, declared once
-site/data/               the rules a firm decides, copied from the product's rule register
 site/templates/          the pages (Jinja)
 site/static/             one stylesheet and the browser scripts (no libraries)
 tools/build.py           renders the pages into dist/
 tools/smoke.py           checks a deployed copy
-tools/sync_rules.py      refreshes site/data from the product's rule register
 tests/                   build tests (pytest) and browser-side tests (node + jsdom)
 infra/modules/           naming, web, account
 infra/seed/              seed.yaml: the CloudFormation seed, the one thing applied by hand
@@ -87,21 +87,6 @@ Try a setting without editing a file:
 python tools/build.py --set pricing.per_bill=12 --set preview.enabled=false
 ```
 
-## The rules a firm decides
-
-`site/data/rules.generated.json` is a copy of the rules in the product's rule
-register that are not fixed, with the register version it came from. The question
-wording for each is in `forms.json`. The build stops if the two disagree: a rule
-with no wording, wording for a rule that is not there, or options that differ.
-
-To refresh the copy after the register changes:
-
-```bash
-python tools/sync_rules.py --register ../automation-portal/draftsman-poc/src/draftsman/rules/register.yaml
-```
-
-This is a copy kept by hand. When the portal has an API, it should read the rules
-from the product, and this file should go.
 
 ## Sign-up, sign-in and the account
 
@@ -149,16 +134,61 @@ request.
 - **Fee earners are not entered here.** They are part of the product's own user
   management.
 
-Table layout: `ACCOUNT#<person>` holds `membership` (firm and role) and `person` (their
-own details); `FIRM#<id>` holds `firm`, `company`, the agreement acceptance, one
-`member#<person>` per member and one `change#<time>` per change.
+### A table, a key and a label for every customer
+
+Each firm has a DynamoDB table and a KMS key of its own, identified by a customer
+number (`0001`, `0002`, ...). Nothing is created when a firm signs up:
+
+- **Terraform makes the tables in advance.** It keeps a number of spares
+  (`customer_spares`) ahead of the highest number taken, so every run of the Site
+  workflow tops the pool back up.
+- **Signing up takes the lowest free number.** The claim is a write that succeeds
+  only once, so two firms can never be given the same table.
+- **A person's sign-in carries their customer number**, in an attribute only the API
+  can set. The browser never sees the number.
+- **Each request reaches one table.** The function has no access to customer tables
+  of its own; it takes 15-minute credentials limited to that customer's table and key.
+- **Each number has a label**, a parameter at `<customer path>/<number>` holding a
+  small JSON: the firm's name, SRA number and company number once given, a status
+  (`free`, `signed up`, `set-up complete`, `left`) and the dates below. It is what
+  account creation will read.
+- **Retention.** The label holds the day the customer left and the day their last case
+  was finished; from those it works out a delete-after date, `retention.years` after
+  the last case (or after leaving, if they never finished one). Nothing is deleted
+  automatically. A customer's table is removed only by naming its number in
+  `removed_customer_numbers`, in a reviewed change. See `runbooks/deploy.md`.
+
+Inside a customer's table: `FIRM` holds `firm`, `company`, the agreement acceptance, one
+`member#<person>` per member, one `change#<time>` per change and the `claim`;
+`PERSON#<person>` holds that person's own details.
+
+The earlier single table still exists so that firms saved in it are moved into their
+own table the next time someone from the firm signs in.
+
+Not built: a way for a customer to leave (the status and dates exist; nothing sets
+them yet), and the product writing the last-case date.
+
+### Versions
+
+A firm chooses the version of the product its account runs, on the Company information
+page. The choice is saved with the firm's answers, written to the customer's label,
+and added to the change record. A firm can move to a newer version and is not moved
+back.
+
+The versions on offer are held in one parameter. It starts with `initial_versions`
+from `platform.tfvars.json`, and a version is added when a tag matching the version
+pattern is made in the repository that holds each customer account's set-up: tagging
+a release is all it takes to offer it. The page reads the list with the account, so a
+new version appears without the site being rebuilt.
+
+Not built: anything acting on the choice. Recording a version does not change a
+customer's account; that is the Account Factory's job, reading the label.
 
 ## What is tested
 
 - **Build (pytest):** every page is built, every internal link resolves, ids are
   unique, every label points at a field, no page has inline code, every field
-  that is validated is rendered, overrides work and bad ones are refused, the
-  rule copy and the wording agree.
+  that is validated is rendered, overrides work and bad ones are refused.
 - **Browser side (node + jsdom, against the built pages):** validation rules; the
   whole sign-up journey; conditional fields; the portal guard and sign out; the
   set-up checklist; company information for a legal aid firm, a private-only
@@ -186,7 +216,6 @@ own details); `FIRM#<id>` holds `firm`, `company`, the agreement acceptance, one
   (labels, fieldsets, error summary, focus management).
 - The agreement text is a draft written from the product's design. It has not
   been reviewed by a solicitor.
-- The private client charging section is a first sketch.
 - The sign-in service, the API gateway's token check and the table are stood in
   for in tests. They are proven only by using the deployed site.
 - Two-step sign-in is off for the sign-up portal. The site says every user of the

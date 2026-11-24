@@ -29,6 +29,7 @@ locals {
     authorizer              = "authz"
     bucket                  = "bkt"
     cloudformation_stack    = "stack"
+    cloudwatch_event_rule   = "rule"
     distribution            = "cdn"
     dynamodb_table          = "tbl"
     function                = "fn"

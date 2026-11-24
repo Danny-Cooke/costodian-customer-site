@@ -32,7 +32,9 @@
     "role_changed": "The role has been changed.",
     "too_many_members": "There are too many people on this account.",
     "no_firm": "Your sign-in is not attached to a firm's account.",
-    "auth_new_password": "Choose your own password to finish signing in."
+    "auth_new_password": "Choose your own password to finish signing in.",
+    "no_capacity": "We are setting up your account. Try again in a few minutes.",
+    "version_older": "Choose the version you are on, or a newer one"
   },
   "formats": {
     "email": {
@@ -411,6 +413,20 @@
             "max_length": 254
           }
         ]
+      },
+      {
+        "id": "version",
+        "title": "Version",
+        "intro": "The version of the product your firm's account runs. You can move to a newer one when it is available.",
+        "fields": [
+          {
+            "id": "product_version",
+            "label": "version",
+            "type": "select",
+            "required": true,
+            "options_from": "versions"
+          }
+        ]
       }
     ],
     "funding": {
@@ -430,163 +446,6 @@
           "type": "checkbox",
           "required": false,
           "default": false
-        }
-      ]
-    },
-    "legal_aid": {
-      "title": "Legal aid positions",
-      "intro": "Most legal aid rules have one answer and the product applies them as written. These are the rules that leave your firm a choice, or where the published guidance is not clear. Each starts on the cautious answer.",
-      "show_if": {
-        "field": "funding_legal_aid",
-        "equals": true
-      },
-      "per_case_note": "This is decided for each case, not for the firm. You will be asked when you create a case.",
-      "positions": {
-        "UNITS-6MIN": {
-          "question": "when recorded time does not fall on a six-minute unit, how it is rounded",
-          "options": {
-            "round_down": "Round down, so the bill never claims more than the time recorded",
-            "nearest_half_down": "To the nearest unit, with exact halves rounded down",
-            "nearest_half_up": "To the nearest unit, with exact halves rounded up"
-          }
-        },
-        "ROUTINE-COUNT": {
-          "question": "how one email or letter sent to several people is counted",
-          "options": {
-            "per_message": "As one item, however many people it went to",
-            "per_recipient": "As one item for each person it went to"
-          }
-        },
-        "LONG-CALLS": {
-          "question": "how a phone call of six minutes or more is claimed",
-          "options": {
-            "timed_attendance": "As timed attendance at the hourly rate",
-            "routine_call": "As a routine call at the fixed item fee"
-          }
-        },
-        "ENH-CLAIM": {
-          "question": "whether enhancement is claimed, and at what level",
-          "per_case": true
-        },
-        "ENH-SCOPE": {
-          "question": "which work enhancement is applied to, when it is claimed",
-          "options": {
-            "timed_preparation_and_attendance": "Timed preparation and attendance only",
-            "include_routine_items": "Also routine letters and calls",
-            "include_travel_and_waiting": "Also travel and waiting",
-            "include_routine_travel_and_waiting": "Also routine items, travel and waiting"
-          }
-        },
-        "BILL-PREP-TIME": {
-          "question": "minutes claimed for preparing the bill",
-          "number": {
-            "min": 0,
-            "max": 600,
-            "default": 30
-          }
-        }
-      }
-    },
-    "private": {
-      "title": "Private client charging",
-      "intro": "How your firm charges privately funded clients. This section is still being designed and will change.",
-      "show_if": {
-        "field": "funding_private",
-        "equals": true
-      },
-      "fields": [
-        {
-          "id": "private_unit_minutes",
-          "label": "length of one time unit in minutes",
-          "type": "number",
-          "required": true,
-          "min": 1,
-          "max": 60,
-          "default": 6
-        },
-        {
-          "id": "private_rate_a",
-          "label": "hourly rate for grade A in pounds",
-          "type": "number",
-          "required": true,
-          "min": 0,
-          "max": 2000
-        },
-        {
-          "id": "private_rate_b",
-          "label": "hourly rate for grade B in pounds",
-          "type": "number",
-          "required": true,
-          "min": 0,
-          "max": 2000
-        },
-        {
-          "id": "private_rate_c",
-          "label": "hourly rate for grade C in pounds",
-          "type": "number",
-          "required": true,
-          "min": 0,
-          "max": 2000
-        },
-        {
-          "id": "private_rate_d",
-          "label": "hourly rate for grade D in pounds",
-          "type": "number",
-          "required": true,
-          "min": 0,
-          "max": 2000
-        },
-        {
-          "id": "private_letters_out",
-          "label": "how letters and emails sent are charged",
-          "type": "radio",
-          "required": true,
-          "options": [
-            {
-              "value": "one_unit",
-              "label": "One unit each"
-            },
-            {
-              "value": "timed",
-              "label": "By the time recorded"
-            }
-          ]
-        },
-        {
-          "id": "private_letters_in",
-          "label": "how letters and emails received are charged",
-          "type": "radio",
-          "required": true,
-          "options": [
-            {
-              "value": "not_charged",
-              "label": "Not charged"
-            },
-            {
-              "value": "half_unit",
-              "label": "Half a unit each"
-            },
-            {
-              "value": "one_unit",
-              "label": "One unit each"
-            }
-          ]
-        },
-        {
-          "id": "private_calls",
-          "label": "how short phone calls are charged",
-          "type": "radio",
-          "required": true,
-          "options": [
-            {
-              "value": "one_unit",
-              "label": "One unit each"
-            },
-            {
-              "value": "timed",
-              "label": "By the time recorded"
-            }
-          ]
         }
       ]
     }

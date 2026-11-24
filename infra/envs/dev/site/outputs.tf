@@ -49,8 +49,53 @@ output "api_base_path" {
 }
 
 output "account_table_name" {
-  description = "The table holding the account record."
+  description = "The one table every firm shared before each customer had its own."
   value       = module.account.table_name
+}
+
+output "customer_parameter_path" {
+  description = "The SSM path holding one label per customer number."
+  value       = module.account.customer_parameter_path
+}
+
+output "versions_parameter_name" {
+  description = "The SSM parameter holding the product's version catalogue as a JSON list."
+  value       = module.account.versions_parameter_name
+}
+
+output "customer_table_name_template" {
+  description = "A customer's table name, with the placeholder where the customer number goes."
+  value       = module.account.customer_table_name_template
+}
+
+output "customer_table_arn_template" {
+  description = "A customer's table ARN, with the placeholder where the customer number goes."
+  value       = module.account.customer_table_arn_template
+}
+
+output "customer_key_alias_template" {
+  description = "A customer's key alias, with the placeholder where the customer number goes."
+  value       = module.account.customer_key_alias_template
+}
+
+output "customer_numbers" {
+  description = "Every customer number in the pool, claimed and free, lowest first."
+  value       = module.account.customer_numbers
+}
+
+output "customer_free_status" {
+  description = "The status word in a label that means nobody has taken that number."
+  value       = module.account.customer_free_status
+}
+
+output "customer_attribute" {
+  description = "The token claim holding a person's customer number."
+  value       = module.account.customer_attribute
+}
+
+output "customer_data_role_arn" {
+  description = "The role a function assumes, with a session policy for one customer, to reach that customer's table."
+  value       = module.account.customer_data_role_arn
 }
 
 output "krystal_redirect_line" {

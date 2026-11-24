@@ -139,6 +139,24 @@ provider "aws" {
 }
 
 provider "aws" {
+  alias  = "parameters"
+  region = var.platform.region
+
+  dynamic "assume_role" {
+    for_each = local.assumed["parameters"]
+
+    content {
+      role_arn     = assume_role.value
+      session_name = local.assume_session_name
+    }
+  }
+
+  default_tags {
+    tags = local.default_tags
+  }
+}
+
+provider "aws" {
   alias  = "compute"
   region = var.platform.region
 

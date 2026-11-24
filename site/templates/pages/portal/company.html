@@ -4,7 +4,7 @@
 <section class="page-head">
   <div class="wrap narrow">
     <h1>{{ page.title }}</h1>
-    <p class="lead">How your firm bills. This is entered once and used for every case.</p>
+    <p class="lead">What we need to bill your firm, and the version your account runs. How you charge your own clients is set up in the product itself.</p>
   </div>
 </section>
 
@@ -24,11 +24,8 @@
         {% if section.intro %}<p>{{ section.intro }}</p>{% endif %}
         {% if section.id == 'funding' %}<p class="error" data-funding-error hidden></p>{% endif %}
         {% for f in section.fields %}
-        {{ ui.field(f, site.rule_kinds) }}
+        {{ ui.field(f) }}
         {% endfor %}
-        {% if section.kind == 'positions' %}
-        <p class="help">Rule wording from the {{ site.product.name }} rule register, version {{ forms.register_version }}.</p>
-        {% endif %}
       </section>
 
       {% endfor %}

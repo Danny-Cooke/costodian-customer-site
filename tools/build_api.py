@@ -18,21 +18,28 @@ from build import ROOT, load_forms, load_site, page_data
 
 API = ROOT / "api"
 CONFIG_NAME = "config.json"
+# How items are keyed inside one customer's table.
 KEYS = {
+    "firm_partition": "FIRM",
+    "person_prefix": "PERSON#",
+    "person": "person",
+    "firm": "firm",
+    "company": "company",
+    "claim": "claim",
+    "member_prefix": "member#",
+    "change_prefix": "change#",
+    "agreement_prefix": "agreement#",
+}
+# How they were keyed in the one table every firm shared, for moving firms out of it.
+LEGACY_KEYS = {
     "account_prefix": "ACCOUNT#",
     "firm_prefix": "FIRM#",
     "membership": "membership",
     "person": "person",
-    "firm": "firm",
-    "company": "company",
-    "member_prefix": "member#",
-    "change_prefix": "change#",
-    "agreement_prefix": "agreement#",
-    "legacy_signup": "signup",
 }
 SCRIPTS = ("signup", "company", "agreements", "people")
 CONFIG_KEYS = {"agreements": "agreement"}
-PAGE_KEYS = ("steps", "sections", "fundingIds", "registerVersion", "fields", "agreement", "inviteFields")
+PAGE_KEYS = ("steps", "sections", "fundingIds", "versionField", "fields", "agreement", "inviteFields")
 
 
 def api_config(site: dict[str, Any]) -> dict[str, Any]:
@@ -49,6 +56,10 @@ def api_config(site: dict[str, Any]) -> dict[str, Any]:
     config["roles"] = sorted(site["roles"])
     config["permissions"] = site["permissions"]
     config["firstMemberRole"] = site["first_member_role"]
+    config["legacyKeys"] = LEGACY_KEYS
+    config["customerStatuses"] = site["customer_statuses"]
+    config["customerLabel"] = site["customer_label"]
+    config["retention"] = site["retention"]
     return config
 
 

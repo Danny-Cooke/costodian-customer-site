@@ -19,6 +19,11 @@ variable "component" {
   type        = string
 }
 
+variable "customer_component" {
+  description = "The bounded context of the per-customer resources: one table, one key and one label parameter per customer number. A second component rather than a second module, because the customer data role is trusted by this component's function roles and the functions are told this component's names, and two modules would have to depend on each other."
+  type        = string
+}
+
 variable "product_name" {
   description = "The product's name as a person reads it, put in place of the product placeholder in the messages the pool sends. Declared once in platform.tfvars.json and passed in."
   type        = string
@@ -111,6 +116,150 @@ variable "table_point_in_time_recovery" {
 variable "table_deletion_protection" {
   description = "Whether the table refuses to be deleted. The sign-up data is the account record, so this is on outside throwaway environments."
   type        = bool
+}
+
+# ------------------------------------------------------- the customer pool
+
+variable "customer_parameter_path" {
+  description = "The SSM parameter path holding one label per customer number, composed by the caller from the platform slots. An SSM parameter name is a path, so it cannot come from the naming module; the caller composes it once and the bootstrap stack scopes its roles to the same path."
+  type        = string
+
+  validation {
+    condition     = startswith(var.customer_parameter_path, "/") && !endswith(var.customer_parameter_path, "/")
+    error_message = "customer_parameter_path must begin with / and must not end with one: the customer number is joined to it."
+  }
+}
+
+variable "customer_number_digits" {
+  description = "How many digits a customer number is written with, zero padded: 4 gives 0001. It is the width of the number in every name, so changing it renames every customer's table and key, which replaces them. Fixed in the first version."
+  type        = number
+
+  validation {
+    condition     = var.customer_number_digits >= 1 && var.customer_number_digits <= 12
+    error_message = "customer_number_digits must be between 1 and 12: the API accepts a customer number of up to twelve digits."
+  }
+}
+
+variable "customer_spares" {
+  description = "How many unclaimed tables the pool keeps beyond the highest claimed number, so that a sign-up takes a table that already exists and creates nothing. Each pipeline run tops the pool back up."
+  type        = number
+
+  validation {
+    condition     = var.customer_spares >= 1
+    error_message = "customer_spares must be at least 1, or a sign-up has nothing to take."
+  }
+}
+
+variable "customer_free_status" {
+  description = "The status word in a label that means nobody has taken that number. Any other value, and a value that cannot be read, counts as claimed, so the pool never shrinks under a live customer."
+  type        = string
+}
+
+variable "customer_parameter_fields" {
+  description = "The two field names in a customer's label: the one holding the number and the one holding the status. The API writes the same two names, so they are declared here and read from the deployed values rather than written twice in two languages."
+  type = object({
+    number = string
+    status = string
+  })
+}
+
+variable "customer_parameter_path_actions" {
+  description = "Which of a function's parameter_actions are taken on the path itself rather than on one parameter under it: listing the pool is a call on the path. Any other action is granted on the parameters under the path and not on the path."
+  type        = list(string)
+}
+
+variable "parameter_type" {
+  description = "SSM parameter type for the ones this module creates. String: neither a customer's label nor the version catalogue is a secret, and nothing in either is personal beyond the firm's own trading name."
+  type        = string
+  default     = "String"
+}
+
+variable "customer_number_placeholder" {
+  description = "What stands in for the customer number in the name, ARN and alias templates the functions are given. The API replaces it with the number of the customer whose table it is reaching, so the two must agree."
+  type        = string
+  default     = "{number}"
+}
+
+variable "removed_customer_numbers" {
+  description = "Customer numbers to leave out of the pool, which destroys that number's table, key and label. The only way a customer's table is ever destroyed: the pool itself never shrinks. Two steps, so that a destroy is deliberate - name the number in unprotected_customer_numbers and apply, then move it here and apply again."
+  type        = list(string)
+  default     = []
+}
+
+variable "unprotected_customer_numbers" {
+  description = "Customer numbers whose table may be deleted, the first half of removing a customer. Everything else keeps customer_table_deletion_protection."
+  type        = list(string)
+  default     = []
+}
+
+variable "customer_table_deletion_protection" {
+  description = "Whether a customer's table refuses to be deleted. It holds that firm's own account record, so this is on outside throwaway environments; scripts/destroy.sh is the one place it is turned off for all of them at once."
+  type        = bool
+}
+
+variable "customer_data_table_actions" {
+  description = "What the customer data role may do on a customer's table. Deliberately every action any function needs on any customer's table: the role is the ceiling and the session policy a function passes when it assumes it is what narrows a request to one customer."
+  type        = list(string)
+}
+
+variable "customer_data_key_actions" {
+  description = "What the customer data role may do with a customer's key, allowed only through DynamoDB and only on keys whose alias matches the customer alias pattern."
+  type        = list(string)
+}
+
+variable "data_role_assume_actions" {
+  description = "What a function role may do to the customer data role: take credentials, and nothing else."
+  type        = list(string)
+  default     = ["sts:AssumeRole"]
+}
+
+variable "legacy_key_actions" {
+  description = "What a function with legacy_table_actions may do with the key the old shared table is encrypted with. Granted only to those functions, and only while that table exists."
+  type        = list(string)
+}
+
+variable "action_list_separator" {
+  description = "What separates the actions in the DATA_ACTIONS environment variable. The API splits on the same character."
+  type        = string
+  default     = ","
+}
+
+variable "customer_attribute_name" {
+  description = "The custom user pool attribute holding a person's customer number. The token claim is the prefix and this name; only the API may write it."
+  type        = string
+}
+
+variable "custom_attribute_prefix" {
+  description = "What Cognito puts before a custom attribute's name in a token claim and in an attribute list."
+  type        = string
+  default     = "custom:"
+}
+
+variable "customer_attribute_data_type" {
+  description = "Type of the customer number attribute. String: it is a zero-padded number, not an integer."
+  type        = string
+  default     = "String"
+}
+
+variable "customer_attribute_mutable" {
+  description = "Whether the API may change a person's customer number after it is first set. Needed to move a person into a firm."
+  type        = bool
+  default     = true
+}
+
+variable "customer_attribute_min_length" {
+  description = "Shortest customer number the pool accepts in the attribute. The longest is customer_number_digits."
+  type        = number
+}
+
+variable "client_read_attributes" {
+  description = "The attributes the browser's app client may read, besides the customer number, which this module adds. Every one of them reaches the browser in the token."
+  type        = list(string)
+}
+
+variable "client_write_attributes" {
+  description = "The attributes the browser's app client may write. The customer number is deliberately not among them: a person who could write their own number could point themselves at another firm's table. Checked at plan."
+  type        = list(string)
 }
 
 # ---------------------------------------------------------------- the sign-in
@@ -278,14 +427,92 @@ variable "token_validity_units" {
 # ------------------------------------------------------------- the functions
 
 variable "functions" {
-  description = "One entry per function: its handler, the routes it answers, and the exact table, key and user pool actions it needs. One role is built per entry from those three lists, so a function can never do another's work. A function with no pool actions gets no pool statement and is not told the pool's id."
+  description = <<-EOT
+    One entry per function: its handler, the routes it answers, and the exact
+    actions it needs, by what they are taken on. One role is built per entry
+    from those lists, so a function can never do another's work.
+
+    data_actions are the only ones that do not appear in the role: no function
+    may reach a customer's table itself. They are given to the function as an
+    environment variable, and the function puts them in the session policy it
+    passes to sts:AssumeRole on the customer data role, which narrows that one
+    request to one customer's table. The role's own ceiling is the data role's
+    policy; this list is what the function asks for within it.
+
+    parameter_actions are taken on the customer label parameters and nothing
+    else; versions_actions on the one version catalogue parameter and nothing
+    else; pool_actions on this user pool and nothing else; legacy_table_actions
+    on the one table every firm shared before each had its own, which stays
+    only until the firms signed up before then have been moved out of it. An
+    empty list writes no statement at all, so a function that does not need a
+    service never mentions it, and a function with no data_actions is not even
+    allowed to take customer data credentials.
+
+    routes may be empty: a function that answers no request is reached another
+    way, and gets no integration, no route and no permission for the API.
+  EOT
   type = map(object({
-    handler       = string
-    routes        = list(string)
-    table_actions = list(string)
-    key_actions   = list(string)
-    pool_actions  = list(string)
+    handler              = string
+    routes               = list(string)
+    data_actions         = list(string)
+    parameter_actions    = list(string)
+    pool_actions         = list(string)
+    legacy_table_actions = list(string)
+    versions_actions     = optional(list(string), [])
   }))
+
+  validation {
+    condition     = length([for name, fn in var.functions : name if length(fn.data_actions) > 0]) > 0
+    error_message = "functions: at least one function must have data_actions, or the customer data role would be trusted by nobody."
+  }
+}
+
+# -------------------------------------------------- the version catalogue
+
+variable "versions_parameter_name" {
+  description = "The SSM parameter holding the product's version catalogue as a JSON list, composed by the caller from the platform slots beside the customer path. One parameter, not a path of them."
+  type        = string
+
+  validation {
+    condition     = startswith(var.versions_parameter_name, "/") && !endswith(var.versions_parameter_name, "/")
+    error_message = "versions_parameter_name must begin with / and must not end with one."
+  }
+}
+
+variable "initial_versions" {
+  description = "The versions the catalogue starts with. Written once; the value is ignored after that, because the catalogue function appends to it."
+  type        = list(string)
+}
+
+variable "version_tag_pattern" {
+  description = "The pattern a git tag must match to be a product version. Given to every function, so the one that appends to the catalogue and the ones that read it agree on what a version is."
+  type        = string
+}
+
+variable "version_source_repository" {
+  description = "The CodeCommit repository whose tags are product versions, in this account and Region. Its ARN is composed from the platform slots."
+  type        = string
+}
+
+variable "version_source_event" {
+  description = "What the rule matches: the event source, its detail type, which reference events count and which kind of reference. A tag created or moved in that one repository, and nothing else."
+  type = object({
+    source          = string
+    detail_type     = string
+    events          = list(string)
+    reference_types = list(string)
+  })
+}
+
+variable "version_catalogue_function" {
+  description = "Which key of var.functions the version rule invokes. It answers no route: the rule is its only caller."
+  type        = string
+}
+
+variable "events_service_principal" {
+  description = "The service principal allowed to invoke the function the version rule targets."
+  type        = string
+  default     = "events.amazonaws.com"
 }
 
 variable "function_permissions_boundary_arn" {

@@ -26,8 +26,3 @@ def site() -> dict:
 @pytest.fixture(scope="session")
 def forms() -> dict:
     return build_tool.load_json(build_tool.CONFIG_DIR / "forms.json")
-
-
-@pytest.fixture(scope="session")
-def rules() -> dict:
-    return build_tool.load_json(build_tool.RULES)

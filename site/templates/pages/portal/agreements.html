@@ -69,7 +69,7 @@
       <h2>Accept the agreement</h2>
       {{ ui.error_summary(forms.messages) }}
       {% for f in forms.agreement.fields %}
-      {{ ui.field(f, site.rule_kinds) }}
+      {{ ui.field(f) }}
       {% endfor %}
       <p class="actions"><button type="submit" class="button large">Accept the agreement</button></p>
     </form>
