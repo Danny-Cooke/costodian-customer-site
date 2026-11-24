@@ -124,8 +124,115 @@ variable "key_logs_actions" {
 }
 
 variable "table_deletion_protection" {
-  description = "Whether the account table refuses to be deleted."
+  description = "Whether the one table every firm shared before each had its own refuses to be deleted."
   type        = bool
+}
+
+# ------------------------------------------------------- the customer pool
+
+variable "customer_number_digits" {
+  description = "How many digits a customer number is written with, zero padded. It is in every customer table and key name, so changing it replaces them."
+  type        = number
+}
+
+variable "customer_spares" {
+  description = "How many unclaimed tables the pool keeps beyond the highest claimed number, so a sign-up creates nothing."
+  type        = number
+}
+
+variable "customer_free_status" {
+  description = "The status word in a customer's label that means nobody has taken that number."
+  type        = string
+}
+
+variable "customer_parameter_fields" {
+  description = "The two field names in a customer's label: the number and the status."
+  type = object({
+    number = string
+    status = string
+  })
+}
+
+variable "customer_parameter_path_actions" {
+  description = "Which label actions are taken on the parameter path itself rather than on one parameter under it."
+  type        = list(string)
+}
+
+variable "customer_table_deletion_protection" {
+  description = "Whether a customer's table refuses to be deleted. Only scripts/destroy.sh turns it off, for all of them at once."
+  type        = bool
+}
+
+variable "removed_customer_numbers" {
+  description = "Customer numbers to leave out of the pool, which destroys that number's table, key and label. The only way a customer's table is ever destroyed."
+  type        = list(string)
+}
+
+variable "unprotected_customer_numbers" {
+  description = "Customer numbers whose table may be deleted: the first of the two applies that remove a customer."
+  type        = list(string)
+}
+
+variable "customer_data_table_actions" {
+  description = "What the customer data role may do on a customer's table. The ceiling; a session policy narrows each request to one customer."
+  type        = list(string)
+}
+
+variable "customer_data_key_actions" {
+  description = "What the customer data role may do with a customer's key, through DynamoDB only."
+  type        = list(string)
+}
+
+variable "legacy_key_actions" {
+  description = "What a function that still reads the old shared table may do with that table's key."
+  type        = list(string)
+}
+
+# ---------------------------------------------------- the version catalogue
+
+variable "version_tag_pattern" {
+  description = "The pattern a git tag must match to be a product version. Given to every function, so the one that writes the catalogue and the ones that read it agree."
+  type        = string
+}
+
+variable "version_source_repository" {
+  description = "The CodeCommit repository in this account and Region whose tags are product versions."
+  type        = string
+}
+
+variable "version_source_event" {
+  description = "What the version rule matches: the event source, its detail type, which reference events count and which kind of reference."
+  type = object({
+    source          = string
+    detail_type     = string
+    events          = list(string)
+    reference_types = list(string)
+  })
+}
+
+variable "version_catalogue_function" {
+  description = "Which key of the functions map the version rule invokes. That function answers no route."
+  type        = string
+}
+
+variable "customer_attribute_name" {
+  description = "The custom user pool attribute holding a person's customer number. Adding it is an in-place change to the pool; Cognito cannot change or remove one afterwards."
+  type        = string
+}
+
+variable "customer_attribute_min_length" {
+  description = "Shortest customer number the pool accepts in that attribute."
+  type        = number
+}
+
+variable "client_read_attributes" {
+  description = "The attributes the browser's app client may read, besides the customer number, which the account module adds."
+  type        = list(string)
+}
+
+variable "client_write_attributes" {
+  description = "The attributes the browser's app client may write. The customer number is deliberately not one of them."
+  type        = list(string)
 }
 
 variable "username_attributes" {
@@ -229,13 +336,15 @@ variable "token_validity_units" {
 }
 
 variable "functions" {
-  description = "The sign-up functions: handler, routes, and the exact table, key and user pool actions each one's own role is built from."
+  description = "The sign-up functions: handler, the routes each answers, which may be none, and the exact actions each one's own role is built from. data_actions are the only ones not in the role: they are what the function asks for in the session policy it passes when it takes credentials for one customer's table, and a function with none of them cannot assume that role at all."
   type = map(object({
-    handler       = string
-    routes        = list(string)
-    table_actions = list(string)
-    key_actions   = list(string)
-    pool_actions  = list(string)
+    handler              = string
+    routes               = list(string)
+    data_actions         = list(string)
+    parameter_actions    = list(string)
+    pool_actions         = list(string)
+    legacy_table_actions = list(string)
+    versions_actions     = optional(list(string), [])
   }))
 }
 

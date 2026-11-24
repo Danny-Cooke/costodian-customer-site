@@ -156,7 +156,7 @@
       "area": "portal",
       "label": "Company information",
       "title": "Company information",
-      "description": "Billing set-up and how your firm bills.",
+      "description": "Billing set-up and the version your firm runs.",
       "scripts": [
         "company"
       ]
@@ -203,7 +203,7 @@
       "id": "company",
       "route": "company",
       "title": "Company information",
-      "summary": "Billing set-up and how your firm bills."
+      "summary": "Billing set-up and the version your firm runs."
     },
     {
       "id": "agreement",
@@ -217,10 +217,6 @@
     "title": "Data Processing Agreement",
     "version": "draft-0.1",
     "draft": true
-  },
-  "rule_kinds": {
-    "judgment": "The rules give your firm this choice",
-    "unclear": "The published guidance is not clear"
   },
   "labels": {
     "yes": "Yes",
@@ -294,6 +290,19 @@
     "agreement": "accepted the agreement",
     "invited": "invited {subject} as {role}",
     "role": "made {subject} {role}",
-    "removed": "removed {subject}"
-  }
+    "removed": "removed {subject}",
+    "version": "moved the firm to version {subject}"
+  },
+  "customer_statuses": {
+    "signed_up": "signed up",
+    "complete": "set-up complete",
+    "left": "left"
+  },
+  "customer_label": {
+    "name": "firm_name",
+    "company_number": "firm_company_number",
+    "sra_number": "firm_sra_number",
+    "version": "product_version"
+  },
+  "version_field": "product_version"
 }

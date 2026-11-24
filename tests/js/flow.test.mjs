@@ -178,13 +178,21 @@ test("the account is ready only when both steps are done for the current agreeme
 
 const BILLING = { laa_account_number: "0A123B", office_region: "London", vat_number: "123456789" };
 
-test("company information opens with the cautious positions chosen and no fee earners to enter", async () => {
+test("company information asks for billing set-up and the version, and nothing about how the firm charges", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
   assert.equal(page.all("[data-row], [data-add-row]").length, 0, "fee earners are managed in the product");
-  assert.equal(page.one('[data-input="position_UNITS-6MIN"]:checked').value, "round_down");
-  assert.equal(page.one('[data-input="position_ROUTINE-COUNT"]:checked').value, "per_message");
-  assert.equal(page.one('[data-section="legal_aid"]').hidden, false);
-  assert.equal(page.one('[data-section="private"]').hidden, true, "private charging is off until chosen");
+  assert.equal(page.all('[data-input^="position_"], [data-input^="private_"]').length, 0, "charging is set up in the product");
+  assert.deepEqual(
+    page.all("[data-section]").map((section) => section.dataset.section),
+    ["funding", "billing", "version"],
+  );
+});
+
+test("the newest version is offered first to a firm that has chosen none", async () => {
+  const page = await open("company", storageWith(SIGNED_UP));
+  const select = page.one('[data-input="product_version"]');
+  assert.ok(select.options.length >= 1);
+  assert.equal(select.value, select.options[select.options.length - 1].value);
 });
 
 test("company information is not saved while anything on show is missing", async () => {
@@ -194,27 +202,21 @@ test("company information is not saved while anything on show is missing", async
   assert.equal(page.error("laa_account_number"), "Enter LAA account number");
   assert.equal(page.error("office_region"), "Choose office region");
   assert.equal(page.error("vat_number"), "Enter VAT number");
-  assert.equal(page.error("private_rate_a"), "", "a hidden section is not checked");
   assert.equal(page.one("[data-saved]").hidden, true);
   assert.equal("company" in page.state(), false);
 });
 
-test("a complete company information page is saved with the positions", async () => {
+test("a complete company information page is saved with the version chosen", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
   fill(page, BILLING);
-  page.set("position_ROUTINE-COUNT", "per_recipient");
   page.submit();
 
   assert.equal(page.one("[data-summary]").hidden, true);
   assert.equal(page.one("[data-saved]").hidden, false);
   const { company } = page.state();
   assert.ok(company.savedAt);
-  assert.ok(company.registerVersion);
   assert.equal(company.values.office_region, "London");
-  assert.equal(company.values["position_ROUTINE-COUNT"], "per_recipient");
-  assert.equal(company.values["position_UNITS-6MIN"], "round_down");
-  assert.equal(company.values["position_BILL-PREP-TIME"], "30");
-  assert.equal("private_rate_a" in company.values, false);
+  assert.equal(company.values.product_version, page.one('[data-input="product_version"]').value);
   assert.equal("feeEarners" in company, false);
 });
 
@@ -228,33 +230,19 @@ test("without VAT registration the VAT number is neither shown nor required", as
   assert.equal("vat_number" in page.state().company.values, false);
 });
 
-test("a private-only firm fills in private charging and is not asked for legal aid details", async () => {
+test("a private-only firm is not asked for a legal aid account number", async () => {
   const page = await open("company", storageWith(SIGNED_UP));
   page.set("funding_legal_aid", false);
   page.set("funding_private", true);
-  assert.equal(page.one('[data-section="legal_aid"]').hidden, true);
-  assert.equal(page.one('[data-section="private"]').hidden, false);
   assert.equal(page.field("laa_account_number").hidden, true);
 
   fill(page, { office_region: "London", vat_number: "123456789" });
   page.submit();
-  assert.equal(page.error("private_rate_a"), "Enter hourly rate for grade A in pounds");
   assert.equal(page.error("laa_account_number"), "");
-
-  fill(page, {
-    private_rate_a: "300",
-    private_rate_b: "250",
-    private_rate_c: "200",
-    private_rate_d: "120",
-    private_letters_out: "one_unit",
-    private_letters_in: "not_charged",
-    private_calls: "one_unit",
-  });
-  page.submit();
   assert.equal(page.one("[data-saved]").hidden, false);
   const { values } = page.state().company;
-  assert.equal(values.private_unit_minutes, "6");
-  assert.equal("position_UNITS-6MIN" in values, false, "legal aid positions are not kept for a private-only firm");
+  assert.equal(values.funding_private, true);
+  assert.equal("laa_account_number" in values, false);
 });
 
 test("at least one type of funding is needed", async () => {

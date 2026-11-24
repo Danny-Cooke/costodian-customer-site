@@ -46,7 +46,7 @@
     <form novalidate data-form>
       {{ ui.error_summary(forms.messages) }}
       {% for f in forms.people.invite.fields %}
-      {{ ui.field(f, site.rule_kinds) }}
+      {{ ui.field(f) }}
       {% endfor %}
       <p class="actions"><button type="submit" class="button large">Send the invitation</button></p>
     </form>

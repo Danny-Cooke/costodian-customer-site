@@ -135,11 +135,12 @@ export function createAuth(data, { fetcher = globalThis.fetch, storage, clock = 
       call("ConfirmForgotPassword", { ClientId: settings.clientId, Username: email, ConfirmationCode: code, Password: password }),
 
     // The token to send with an API request, renewed first if it is about to
-    // run out. Null means the person has to sign in again.
-    async token() {
+    // run out or if `fresh` is asked for. Null means the person has to sign
+    // in again.
+    async token({ fresh = false } = {}) {
       const current = session();
       if (!current) return null;
-      if (current.expiresAt - clock() > settings.refreshMarginSeconds * 1000) return current.idToken;
+      if (!fresh && current.expiresAt - clock() > settings.refreshMarginSeconds * 1000) return current.idToken;
       try {
         const answer = await call("InitiateAuth", {
           ClientId: settings.clientId,

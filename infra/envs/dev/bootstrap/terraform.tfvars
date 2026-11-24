@@ -123,8 +123,11 @@ service_roles = {
   keys = {
     description = "Creates the sign-up component's KMS key and its alias."
     statements = {
-      account_key = {
-        resources = ["account_key"]
+      # Every key in the account and Region: the sign-up component's and every
+      # customer's. A key id is generated, so no key can be named, and each
+      # key's own policy allows its use through DynamoDB only.
+      any_key = {
+        resources = ["any_key"]
         read_actions = [
           "kms:DescribeKey",
           "kms:GetKeyPolicy",
@@ -147,8 +150,10 @@ service_roles = {
           "kms:UpdateKeyDescription",
         ]
       }
-      account_alias = {
-        resources     = ["account_alias"]
+      # The sign-up component's alias and every customer's. An alias can be
+      # named, so it is, and the same three calls serve both.
+      aliases = {
+        resources     = ["account_alias", "customer_alias"]
         read_actions  = []
         write_actions = ["kms:CreateAlias", "kms:DeleteAlias", "kms:UpdateAlias"]
       }
@@ -297,10 +302,14 @@ service_roles = {
 
   # --------------------------------------------------------------------- data
   data = {
-    description = "Creates the account table, its backups and its encryption."
+    description = "Creates each customer's table and the old shared one, their backups and their encryption."
     statements = {
-      account_table = {
-        resources = ["account_table"]
+      # Every customer's table and the one every firm shared before each had its
+      # own. The same calls create, protect and delete either, so they are one
+      # statement; the Destroy workflow runs as this role, so the deletes are
+      # here too.
+      tables = {
+        resources = ["account_table", "customer_table"]
         read_actions = [
           "dynamodb:DescribeContinuousBackups",
           "dynamodb:DescribeKinesisStreamingDestination",
@@ -324,7 +333,7 @@ service_roles = {
       # only when DynamoDB is the one calling, so this grant adds nothing out
       # of band.
       table_key = {
-        resources     = ["account_key"]
+        resources     = ["any_key"]
         read_actions  = ["kms:DescribeKey"]
         write_actions = ["kms:CreateGrant", "kms:ListGrants", "kms:RevokeGrant"]
       }
@@ -336,9 +345,49 @@ service_roles = {
     }
   }
 
+  # --------------------------------------------------------------- parameters
+  parameters = {
+    description = "Creates one label parameter per customer number and the version catalogue, and reads the pool of labels at plan time."
+    statements = {
+      # One customer's label and the one version catalogue parameter: the
+      # provider reads either with GetParameter and its metadata with
+      # DescribeParameters, which takes no resource, and writes either with
+      # PutParameter and its tags with the two tag calls.
+      labels_and_versions = {
+        resources = ["customer_labels", "versions_parameter"]
+        read_actions = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:ListTagsForResource",
+        ]
+        write_actions = [
+          "ssm:AddTagsToResource",
+          "ssm:DeleteParameter",
+          "ssm:PutParameter",
+          "ssm:RemoveTagsFromResource",
+        ]
+      }
+      # Reading the whole pool is a call on the path itself, and it is a read:
+      # the plan role gets it from here, because the data source that sizes the
+      # pool runs at plan time.
+      customer_label_path = {
+        resources     = ["customer_label_path"]
+        read_actions  = ["ssm:GetParametersByPath"]
+        write_actions = []
+      }
+      # DescribeParameters is a list call and takes no resource. The provider
+      # uses it on every refresh of a parameter, for the description and tier.
+      parameter_listing = {
+        resources     = ["unscopable"]
+        read_actions  = ["ssm:DescribeParameters"]
+        write_actions = []
+      }
+    }
+  }
+
   # ------------------------------------------------------------------ compute
   compute = {
-    description = "Creates the functions, the HTTP API and the log groups, and may pass the function roles to Lambda and nothing else."
+    description = "Creates the functions, the HTTP API, the log groups and the version rule, and may pass the function roles to Lambda and nothing else."
     statements = {
       account_functions = {
         resources = ["account_functions"]
@@ -389,7 +438,7 @@ service_roles = {
       # CloudWatch Logs checks that whoever creates an encrypted log group can
       # see the key it names.
       account_key_for_log_groups = {
-        resources    = ["account_key"]
+        resources    = ["any_key"]
         read_actions = []
         write_actions = [
           "kms:DescribeKey",
@@ -429,6 +478,25 @@ service_roles = {
         ]
         write_actions = []
       }
+      # The rule that invokes the catalogue function when a version tag is
+      # created. The rule is named, so it is scoped by name; the permission the
+      # rule needs on the function is granted by lambda:AddPermission above.
+      account_event_rules = {
+        resources = ["account_event_rules"]
+        read_actions = [
+          "events:DescribeRule",
+          "events:ListTagsForResource",
+          "events:ListTargetsByRule",
+        ]
+        write_actions = [
+          "events:DeleteRule",
+          "events:PutRule",
+          "events:PutTargets",
+          "events:RemoveTargets",
+          "events:TagResource",
+          "events:UntagResource",
+        ]
+      }
       # It may hand a function role to Lambda and to nothing else, and only a
       # role of the sign-up component.
       pass_function_roles = {
@@ -448,10 +516,12 @@ service_roles = {
 
   # ------------------------------------------------------------------- access
   access = {
-    description = "Creates the sign-up functions' own roles and inline policies, and only with the permissions boundary."
+    description = "Creates the sign-up functions' own roles, the customer data role they assume, and their inline policies, and only with the permissions boundary."
     statements = {
-      account_function_roles = {
-        resources = ["account_function_roles"]
+      # A function's role and the customer data role, which is under the
+      # customer component's prefix and carries the same boundary.
+      function_and_data_roles = {
+        resources = ["account_function_roles", "customer_roles"]
         read_actions = [
           "iam:GetRole",
           "iam:GetRolePolicy",
@@ -543,9 +613,11 @@ access_protected_write_actions = [
   "iam:UpdateRoleDescription",
 ]
 
-# The ceiling on a sign-up function: the account table, the account key through
-# DynamoDB, its own log stream, and the three calls that manage a firm's members
-# in the sign-in pool. Nothing a function is given can exceed it.
+# The ceiling on a sign-up function, and on the customer data role it assumes:
+# a customer's table or the old shared one, those tables' keys through DynamoDB,
+# its own log stream, the calls that manage a firm's members and which customer
+# a person belongs to, taking customer data credentials, and the customer
+# labels. Nothing any of those roles is given can exceed it.
 function_boundary = {
   dynamodb_actions = [
     "dynamodb:BatchGetItem",
@@ -566,11 +638,26 @@ function_boundary = {
     "logs:CreateLogStream",
     "logs:PutLogEvents",
   ]
-  # Adding a member, removing one, and ending a removed member's sessions.
-  # Nothing that reads the directory or changes the pool's own settings.
+  # Adding a member, removing one, ending a removed member's sessions, and
+  # reading and setting which customer a person belongs to. Nothing that lists
+  # the directory or changes the pool's own settings.
   cognito_actions = [
     "cognito-idp:AdminCreateUser",
     "cognito-idp:AdminDeleteUser",
+    "cognito-idp:AdminGetUser",
+    "cognito-idp:AdminUpdateUserAttributes",
     "cognito-idp:AdminUserGlobalSignOut",
   ]
+  # Taking credentials for one customer's table, and nothing else. A function
+  # cannot become anything but the customer data role, and that role cannot
+  # become anything at all.
+  sts_actions = ["sts:AssumeRole"]
+  # One customer's label: read it, write it. Not deleting it: Terraform makes
+  # and removes the labels, the API only keeps them up to date.
+  ssm_actions = [
+    "ssm:GetParameter",
+    "ssm:GetParameters",
+    "ssm:PutParameter",
+  ]
+  ssm_path_actions = ["ssm:GetParametersByPath"]
 }

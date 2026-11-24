@@ -128,12 +128,15 @@ variable "access_protected_write_actions" {
 }
 
 variable "function_boundary" {
-  description = "The permissions boundary for the sign-up functions' roles: the most any function may ever be granted, by service. A function's own policy is narrower; this is the ceiling, and it is not written by the pipeline's IAM role."
+  description = "The permissions boundary for the sign-up functions' roles and for the customer data role they assume: the most any of them may ever be granted, by service. A role's own policy is narrower; this is the ceiling, and it is not written by the pipeline's IAM role. ssm_path_actions are the ones taken on the label path itself rather than on one label under it."
   type = object({
     dynamodb_actions = list(string)
     kms_actions      = list(string)
     logs_actions     = list(string)
     cognito_actions  = list(string)
+    sts_actions      = list(string)
+    ssm_actions      = list(string)
+    ssm_path_actions = list(string)
   })
 }
 

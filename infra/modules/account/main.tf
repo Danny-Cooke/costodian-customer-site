@@ -1,10 +1,17 @@
 # The sign-up back end: a Cognito pool the firm signs itself up in and invites
-# its members to, one DynamoDB table holding the account record, and one small
-# function per job behind an HTTP API that only accepts a Cognito token.
-# Everything is encrypted with one customer-managed key, and every function has
-# its own role, built from the exact table, key and pool actions that function
-# needs: the read function cannot write, and only the function that manages the
-# firm's members may touch the pool.
+# its members to, one small function per job behind an HTTP API that only
+# accepts a Cognito token, and a table and a key of its own for every customer
+# (see customers.tf). Every function has its own role, built from the exact
+# actions that function needs: the read function cannot write, and only the
+# function that manages the firm's members may touch the pool.
+#
+# No function role reaches a customer's table. A function takes short-lived
+# credentials from the customer data role for each request, with a session
+# policy that narrows them to the one customer the signed-in person belongs to.
+#
+# The table here is the one every firm shared before each had its own. It stays
+# only until the firms that signed up before then have been moved out of it, and
+# only the enrol function can still read it.
 #
 # There is no bucket, queue or function here that could hold an identity
 # document. The API is reached through the site's CloudFront distribution, so it
@@ -14,21 +21,23 @@
 # by the role for its own service and nothing silently inherits a broader
 # identity:
 #
-#   aws.keys      the KMS key and its alias
-#   aws.data      the DynamoDB table
-#   aws.identity  the Cognito pool and client
-#   aws.compute   the functions, the HTTP API and the log groups
-#   aws.access    the functions' own roles and inline policies
+#   aws.keys        the KMS keys and their aliases
+#   aws.data        the DynamoDB tables
+#   aws.identity    the Cognito pool and client
+#   aws.parameters  the customer label parameters
+#   aws.compute     the functions, the HTTP API and the log groups
+#   aws.access      the functions' own roles and the customer data role
 #
 # aws.access is the only identity that may write IAM, and it may only write
-# roles under this component's name prefix, each of which must carry the
-# permissions boundary passed in as var.function_permissions_boundary_arn.
+# roles under this component's or the customer component's name prefix, each of
+# which must carry the permissions boundary passed in as
+# var.function_permissions_boundary_arn.
 
 terraform {
   required_providers {
     aws = {
       source                = "hashicorp/aws"
-      configuration_aliases = [aws.keys, aws.data, aws.identity, aws.compute, aws.access]
+      configuration_aliases = [aws.keys, aws.data, aws.identity, aws.parameters, aws.compute, aws.access]
     }
     archive = {
       source = "hashicorp/archive"
@@ -52,6 +61,7 @@ module "naming" {
       api             = "http_api"
       authz           = "authorizer"
       api-log         = "log_group"
+      versions        = "cloudwatch_event_rule"
     },
     # One function, one role, one inline policy and one log group per entry.
     { for name in keys(var.functions) : name => "function" },
@@ -212,8 +222,12 @@ resource "aws_kms_alias" "this" {
   target_key_id = aws_kms_key.this.key_id
 }
 
-# ----------------------------------------------------------------- the table
+# ------------------------------------------------- the old shared table
 
+# Every firm's account record was here before each customer had a table of its
+# own. It stays, with its deletion protection, until the firms that signed up
+# before then have been moved out of it; after that it is removed from this
+# module and nothing else changes.
 resource "aws_dynamodb_table" "this" {
   provider = aws.data
 
@@ -297,6 +311,27 @@ resource "aws_cognito_user_pool" "this" {
     }
   }
 
+  # Which customer a person belongs to, carried in their token as
+  # custom:<name>, so the API knows which table to reach without a lookup. The
+  # app client cannot write it (see write_attributes below): only the API can,
+  # with a role that may update a member's attributes.
+  #
+  # Cognito can add a schema attribute to a live pool but can neither change
+  # nor remove one, so this is an in-place update here and a one-way door: a
+  # later change to the name, type or length would replace the pool, which
+  # deletion protection would refuse.
+  schema {
+    name                = var.customer_attribute_name
+    attribute_data_type = var.customer_attribute_data_type
+    mutable             = var.customer_attribute_mutable
+    required            = false
+
+    string_attribute_constraints {
+      min_length = tostring(var.customer_attribute_min_length)
+      max_length = tostring(var.customer_number_digits)
+    }
+  }
+
   # Cognito's own sender, with its low daily limit. Moving to SES is a change
   # of email_sending_account and a verified identity.
   email_configuration {
@@ -316,6 +351,13 @@ resource "aws_cognito_user_pool_client" "this" {
   explicit_auth_flows           = var.client_auth_flows
   prevent_user_existence_errors = var.prevent_user_existence_errors
   enable_token_revocation       = var.enable_token_revocation
+
+  # Both lists are stated rather than left to default to every attribute. The
+  # browser reads the customer number, because the portal shows what belongs to
+  # that customer; it cannot write it, or a person could point themselves at
+  # another firm's table. The check on write_attributes is in customers.tf.
+  read_attributes  = local.client_read_attributes
+  write_attributes = var.client_write_attributes
 
   id_token_validity      = var.token_validity.id
   access_token_validity  = var.token_validity.access
@@ -382,8 +424,13 @@ resource "aws_iam_role" "function" {
 }
 
 # The whole of least privilege for this component: each function's role carries
-# its own log group, its own table actions and its own key actions, and nothing
-# else. A function needing another's actions is two functions.
+# its own log group, the right to take customer data credentials, and whichever
+# of the label, pool and old-table actions are listed against it. A function
+# needing another's actions is two functions.
+#
+# No statement here names a customer's table or key. That is deliberate: the
+# only way to a customer's data is the customer data role, assumed per request
+# with a session policy for one customer.
 data "aws_iam_policy_document" "function" {
   provider = aws.access
 
@@ -396,27 +443,62 @@ data "aws_iam_policy_document" "function" {
     resources = ["${aws_cloudwatch_log_group.function[each.key].arn}:*"]
   }
 
-  statement {
-    sid       = "UseTheAccountTable"
-    effect    = "Allow"
-    actions   = each.value.table_actions
-    resources = [aws_dynamodb_table.this.arn]
+  # Only a function that reaches a customer's table at all. A function with no
+  # data_actions cannot become the customer data role, and the data role does
+  # not trust it either.
+  dynamic "statement" {
+    for_each = length(each.value.data_actions) > 0 ? [var.data_role_assume_actions] : []
+
+    content {
+      sid       = "TakeCustomerDataCredentials"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [aws_iam_role.customer_data.arn]
+    }
   }
 
-  # The table's encryption is done by DynamoDB under its own grant, so these
-  # are what the function would need if it ever called KMS itself. The key
-  # policy allows the key's use through DynamoDB only, so this grant is the
-  # narrower of the two and the function cannot decrypt anything out of band.
-  statement {
-    sid       = "UseTheAccountKey"
-    effect    = "Allow"
-    actions   = each.value.key_actions
-    resources = [aws_kms_key.this.arn]
+  # The version catalogue: one parameter, read by the functions that show a
+  # version and written by the one the version rule invokes.
+  dynamic "statement" {
+    for_each = length(each.value.versions_actions) > 0 ? [each.value.versions_actions] : []
+
+    content {
+      sid       = "ReadAndWriteTheVersionCatalogue"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [local.versions_parameter_arn]
+    }
   }
 
-  # Only a function that manages the firm's members gets this, and only on this
-  # one pool. The statement is left out entirely when the list is empty, so no
-  # other function's role mentions Cognito at all.
+  # Listing the pool of customer numbers is granted on the path itself; reading
+  # and writing one customer's label is granted under it. Both statements are
+  # left out entirely for a function with no label actions.
+  dynamic "statement" {
+    for_each = length(local.function_parameter_path_actions[each.key]) > 0 ? [local.function_parameter_path_actions[each.key]] : []
+
+    content {
+      sid       = "ListTheCustomerLabels"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [local.customer_parameter_path_arn]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(local.function_parameter_actions[each.key]) > 0 ? [local.function_parameter_actions[each.key]] : []
+
+    content {
+      sid       = "ReadAndWriteACustomerLabel"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [local.customer_parameter_arn_pattern]
+    }
+  }
+
+  # Only a function that manages the firm's members or attaches a person to a
+  # customer gets this, and only on this one pool. The statement is left out
+  # entirely when the list is empty, so no other function's role mentions
+  # Cognito at all.
   dynamic "statement" {
     for_each = length(each.value.pool_actions) > 0 ? [each.value.pool_actions] : []
 
@@ -425,6 +507,35 @@ data "aws_iam_policy_document" "function" {
       effect    = "Allow"
       actions   = statement.value
       resources = [aws_cognito_user_pool.this.arn]
+    }
+  }
+
+  # The one table every firm shared, and the key it is encrypted with. Only the
+  # function that moves a firm out of it holds these, and both statements go
+  # when that table does.
+  dynamic "statement" {
+    for_each = length(each.value.legacy_table_actions) > 0 ? [each.value.legacy_table_actions] : []
+
+    content {
+      sid       = "ReadTheOldSharedTableToMoveFirmsOutOfIt"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [aws_dynamodb_table.this.arn]
+    }
+  }
+
+  # The old table's encryption is done by DynamoDB under its own grant, so this
+  # is what the function would need if it ever called KMS itself. The key policy
+  # allows the key's use through DynamoDB only, so this grant is the narrower of
+  # the two and the function cannot decrypt anything out of band.
+  dynamic "statement" {
+    for_each = length(each.value.legacy_table_actions) > 0 ? [var.legacy_key_actions] : []
+
+    content {
+      sid       = "UseTheOldSharedTablesKey"
+      effect    = "Allow"
+      actions   = statement.value
+      resources = [aws_kms_key.this.arn]
     }
   }
 }
@@ -460,18 +571,35 @@ resource "aws_lambda_function" "this" {
     log_group  = aws_cloudwatch_log_group.function[each.key].name
   }
 
-  # The table's name and key attribute names, so the code holds no literal
-  # either. Nothing here is a secret. The pool's id is given only to a function
-  # whose role may act on the pool, so a function that is not allowed to cannot
-  # even name it.
+  # Everything the code would otherwise hold as a literal: where to take
+  # customer data credentials, what to ask for when it does, how a customer's
+  # table, key alias and label are named, and the two key attributes. Nothing
+  # here is a secret, and none of it names one customer: the number comes from
+  # the signed-in person's token, and the templates turn it into a name.
+  #
+  # Every function is given the pool's id now, because every request reads the
+  # customer number the pool holds; what a function may do with the pool is its
+  # role's business, and a function with no pool actions can do nothing with it.
+  # The old shared table is named only to the function that moves firms out of
+  # it.
   environment {
     variables = merge(
       {
-        TABLE_NAME      = aws_dynamodb_table.this.name
-        TABLE_HASH_KEY  = var.table_hash_key
-        TABLE_RANGE_KEY = var.table_range_key
+        DATA_ROLE_ARN                = aws_iam_role.customer_data.arn
+        DATA_ACTIONS                 = join(var.action_list_separator, each.value.data_actions)
+        CUSTOMER_TABLE_NAME_TEMPLATE = local.customer_table_name_template
+        CUSTOMER_TABLE_ARN_TEMPLATE  = local.customer_table_arn_template
+        CUSTOMER_KEY_ALIAS_TEMPLATE  = local.customer_key_alias_template
+        CUSTOMER_PARAMETER_PATH      = var.customer_parameter_path
+        CUSTOMER_ATTRIBUTE           = local.customer_attribute
+        CUSTOMER_FREE_STATUS         = var.customer_free_status
+        TABLE_HASH_KEY               = var.table_hash_key
+        TABLE_RANGE_KEY              = var.table_range_key
+        USER_POOL_ID                 = aws_cognito_user_pool.this.id
+        VERSIONS_PARAMETER           = aws_ssm_parameter.versions.name
+        VERSION_TAG_PATTERN          = var.version_tag_pattern
       },
-      length(each.value.pool_actions) > 0 ? { USER_POOL_ID = aws_cognito_user_pool.this.id } : {},
+      length(each.value.legacy_table_actions) > 0 ? { LEGACY_TABLE_NAME = aws_dynamodb_table.this.name } : {},
     )
   }
 

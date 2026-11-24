@@ -35,6 +35,7 @@ const accountOf = (member, more = {}) => ({
     agreement: null,
     people: [OWNER, ADMIN],
     changes: [],
+    versions: ["v1.0", "v1.1"],
     ...more,
   },
 });
@@ -74,8 +75,11 @@ test("signing up creates the sign-in, confirms the code, signs in and saves the 
   const net = network({
     SignUp: () => ({ body: { UserConfirmed: false } }),
     ConfirmSignUp: () => ({ body: {} }),
-    InitiateAuth: () => ({ body: TOKENS }),
-    [`POST ${data.api.firm}`]: () => ({ body: { member: { role: "owner" } } }),
+    InitiateAuth: (request) =>
+      request.body.AuthFlow === "REFRESH_TOKEN_AUTH"
+        ? { body: { AuthenticationResult: { IdToken: "token-with-customer", ExpiresIn: 3600 } } }
+        : { body: TOKENS },
+    [`POST ${data.api.firm}`]: () => ({ body: { member: { role: "owner" }, renew: true } }),
     [`GET ${data.api.account}`]: () => accountOf(OWNER, { signup: null }),
     [`PUT ${data.api.account}/signup`]: (request) => ({ body: { signup: { ...request.body, completedAt: SIGNUP.completedAt } } }),
   });
@@ -107,10 +111,18 @@ test("signing up creates the sign-in, confirms the code, signs in and saves the 
   await settle();
   assert.deepEqual(
     net.requests.map((request) => request.target || `${request.method} ${request.url}`),
-    ["SignUp", "ConfirmSignUp", "InitiateAuth", `POST ${data.api.firm}`, `GET ${data.api.account}`, `PUT ${data.api.account}/signup`],
+    [
+      "SignUp",
+      "ConfirmSignUp",
+      "InitiateAuth",
+      `POST ${data.api.firm}`,
+      "InitiateAuth",
+      `GET ${data.api.account}`,
+      `PUT ${data.api.account}/signup`,
+    ],
   );
   const save = net.requests.at(-1);
-  assert.equal(save.headers.Authorization, "token-1");
+  assert.equal(save.headers.Authorization, "token-with-customer", "the token was renewed once the firm existed");
   for (const [id, value] of Object.entries({ ...YOU, ...FIRM })) assert.equal(save.body.values[id], value, id);
   assert.ok(!Object.keys(save.body.values).some((id) => id.includes("password") || id.startsWith("confirm_")));
   assert.ok(!JSON.stringify(save.body).includes(PASSWORD), "the password is never sent to our API");
@@ -290,14 +302,16 @@ test("a signed-in person with no firm is given one before anything else", async 
     [`GET ${data.api.account}`]: () => (enrolled ? accountOf(OWNER, { signup: null }) : accountOf(null, { signup: null, people: [] })),
     [`POST ${data.api.firm}`]: () => {
       enrolled = true;
-      return { body: { member: { role: "owner" } } };
+      return { body: { member: { role: "owner" }, renew: true } };
     },
+    InitiateAuth: () => ({ body: { AuthenticationResult: { IdToken: "token-with-customer", ExpiresIn: 3600 } } }),
   });
   const page = await openLive("details", sessionWith(memoryStorage()), net);
   assert.deepEqual(
-    net.requests.map((request) => `${request.method} ${request.url}`),
-    [`GET ${data.api.account}`, `POST ${data.api.firm}`, `GET ${data.api.account}`],
+    net.requests.map((request) => request.target || `${request.method} ${request.url}`),
+    [`GET ${data.api.account}`, `POST ${data.api.firm}`, "InitiateAuth", `GET ${data.api.account}`],
   );
+  assert.equal(net.requests.at(-1).headers.Authorization, "token-with-customer");
   assert.deepEqual(page.visited, []);
 });
 
@@ -400,4 +414,23 @@ test("an invited person signs in with the temporary password and chooses their o
   assert.equal(answer.body.Session, "session-1");
   assert.deepEqual(page.visited, [routes.portal]);
   assert.ok(!everythingStored(storage).includes(PASSWORD));
+});
+
+test("the versions on offer come from the API, and a firm's own choice is shown", async () => {
+  const saved = { values: { funding_legal_aid: true, product_version: "v1.0" }, savedAt: "2026-11-18T11:00:00.000Z" };
+  const net = network({
+    [`GET ${data.api.account}`]: () => accountOf(OWNER, { company: saved }),
+    [`PUT ${data.api.account}/company`]: (request) => ({ body: { company: { ...request.body, savedAt: saved.savedAt } } }),
+  });
+  const page = await openLive("company", sessionWith(memoryStorage()), net);
+  const select = page.one('[data-input="product_version"]');
+  assert.deepEqual([...select.options].map((option) => option.value), ["v1.0", "v1.1"], "a version tagged since the build is offered");
+  assert.equal(select.value, "v1.0", "the firm stays on its version until it chooses to move");
+
+  page.set("product_version", "v1.1");
+  fill(page, { laa_account_number: "0A123B", office_region: "London", vat_number: "123456789" });
+  page.submit();
+  await settle();
+  assert.equal(net.requests.at(-1).body.values.product_version, "v1.1");
+  assert.equal("registerVersion" in net.requests.at(-1).body, false);
 });

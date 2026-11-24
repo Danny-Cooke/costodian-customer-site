@@ -39,15 +39,17 @@ module "account" {
   source = "../../../modules/account"
 
   providers = {
-    aws.keys     = aws.keys
-    aws.data     = aws.data
-    aws.identity = aws.identity
-    aws.compute  = aws.compute
-    aws.access   = aws.access
+    aws.keys       = aws.keys
+    aws.data       = aws.data
+    aws.identity   = aws.identity
+    aws.parameters = aws.parameters
+    aws.compute    = aws.compute
+    aws.access     = aws.access
   }
 
-  platform  = local.platform
-  component = var.components.account
+  platform           = local.platform
+  component          = var.components.account
+  customer_component = var.components.customer
 
   # The invitation email tells a new member where to sign in, which is the
   # site's own address. The pool therefore waits on the distribution, which
@@ -63,6 +65,37 @@ module "account" {
   key_logs_actions     = var.key_logs_actions
 
   table_deletion_protection = var.table_deletion_protection
+
+  # The customer pool: one table, one key and one label per number. The path is
+  # composed in shared_locals.tf, so the bootstrap stack scopes its roles to the
+  # same one.
+  customer_parameter_path            = local.customer_parameter_path
+  customer_number_digits             = var.customer_number_digits
+  customer_spares                    = var.customer_spares
+  customer_free_status               = var.customer_free_status
+  customer_parameter_fields          = var.customer_parameter_fields
+  customer_parameter_path_actions    = var.customer_parameter_path_actions
+  customer_table_deletion_protection = var.customer_table_deletion_protection
+  removed_customer_numbers           = var.removed_customer_numbers
+  unprotected_customer_numbers       = var.unprotected_customer_numbers
+  customer_data_table_actions        = var.customer_data_table_actions
+  customer_data_key_actions          = var.customer_data_key_actions
+  legacy_key_actions                 = var.legacy_key_actions
+
+  # The product's version catalogue: one parameter, and the rule that appends to
+  # it when a version tag is created. Its name is composed in shared_locals.tf,
+  # so the bootstrap stack scopes its roles to the same one.
+  versions_parameter_name    = local.versions_parameter_name
+  initial_versions           = var.initial_versions
+  version_tag_pattern        = var.version_tag_pattern
+  version_source_repository  = var.version_source_repository
+  version_source_event       = var.version_source_event
+  version_catalogue_function = var.version_catalogue_function
+
+  customer_attribute_name       = var.customer_attribute_name
+  customer_attribute_min_length = var.customer_attribute_min_length
+  client_read_attributes        = var.client_read_attributes
+  client_write_attributes       = var.client_write_attributes
 
   username_attributes           = var.username_attributes
   auto_verified_attributes      = var.auto_verified_attributes

@@ -6,10 +6,10 @@
 # GitHub each half runs as a different identity and the Destroy workflow runs
 # them as two jobs:
 #
-#   site       the site, the sign-up API, the Cognito pool, the account table
-#              and its key. Run as the deploy role, with each provider chaining
-#              into its own service role, so the destroy is done by the same
-#              identities that did the create.
+#   site       the site, the sign-up API, the Cognito pool, every customer's
+#              table, key and label, and the old shared table. Run as the deploy
+#              role, with each provider chaining into its own service role, so
+#              the destroy is done by the same identities that did the create.
 #   bootstrap  the pipeline's roles and the state bucket. Run as the seed's
 #              bootstrap role.
 #
@@ -140,22 +140,27 @@ if [ "$half" = site ]; then
     -backend-config="key=$site_state_key" \
     -backend-config="region=$region" >/dev/null
 
-  # The account table and the sign-in pool are protected against deletion, and
-  # the site bucket is versioned, so the protection comes off and the bucket is
-  # made emptiable first, by Terraform. The destroy runs with the same values
-  # so that it does not try to put them back.
+  # Every customer's table, the old shared table and the sign-in pool are
+  # protected against deletion, and the site bucket is versioned, so the
+  # protection comes off and the bucket is made emptiable first, by Terraform.
+  # The destroy runs with the same values so that it does not try to put them
+  # back.
   site_vars=(
     -var-file="$PLATFORM_VARS"
     -var="assume_service_roles=${ASSUME_SERVICE_ROLES:-false}"
     -var="table_deletion_protection=false"
+    -var="customer_table_deletion_protection=false"
     -var="user_pool_deletion_protection=INACTIVE"
     -var="web_bucket_force_destroy=true"
   )
 
   if terraform -chdir="$site_stack" state list 2>/dev/null | grep -q .; then
-    note "taking the deletion protection off the table and the pool"
+    note "taking the deletion protection off the tables and the pool"
+    # Naming the resource targets every customer's table: one -target covers
+    # every instance of a for_each resource.
     terraform -chdir="$site_stack" apply -input=false -no-color -auto-approve "${site_vars[@]}" \
       -target=module.account.aws_dynamodb_table.this \
+      -target=module.account.aws_dynamodb_table.customer \
       -target=module.account.aws_cognito_user_pool.this
   fi
 

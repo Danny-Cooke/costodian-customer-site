@@ -28,10 +28,26 @@ variable "platform" {
 variable "components" {
   description = "The component token of each bounded context."
   type = object({
-    web     = string
-    ci      = string
-    account = string
+    web      = string
+    ci       = string
+    account  = string
+    customer = string
   })
+}
+
+variable "versions_parameter_segment" {
+  description = "The segment of the SSM parameter path holding the product's version catalogue, beside the customer path. Declared with the shared values because both stacks need it: the site stack creates the parameter, the bootstrap stack scopes the roles that may read and write it."
+  type        = string
+}
+
+variable "initial_versions" {
+  description = "The product versions the catalogue starts with. Terraform writes them once and then leaves the value alone: the catalogue function appends to it when a version tag is created. Declared with the shared values because the site build reads this same file."
+  type        = list(string)
+}
+
+variable "customer_parameter_segment" {
+  description = "The segment of the SSM parameter path holding one label per customer number. An SSM parameter name is a path, not the naming module's hyphenated form, so the path is composed in shared_locals.tf from the same slots the naming module uses and this is its last fixed segment. Declared with the shared values because both stacks need it: the site stack creates the parameters, the bootstrap stack scopes the roles that may read and write them."
+  type        = string
 }
 
 variable "services" {

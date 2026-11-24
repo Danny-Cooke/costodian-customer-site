@@ -43,7 +43,7 @@ form.addEventListener("submit", (event) => {
 
   account.save(
     "company",
-    { values: visibleValues(fields, entered), registerVersion: data.registerVersion },
+    { values: visibleValues(fields, entered) },
     () => {
       savedPanel.hidden = false;
       focusOn(savedPanel);
@@ -54,5 +54,20 @@ form.addEventListener("submit", (event) => {
 
 const account = await loadAccount(data).catch(() => null);
 const saved = account?.state().company;
+
+// The versions on offer are read with the account, so a new one appears without
+// the site being rebuilt. A firm that has chosen none yet is offered the newest.
+const versions = account?.state().versions ?? data.versions;
+const versionSelect = form.querySelector(`[data-input="${CSS.escape(data.versionField)}"]`);
+versionSelect.replaceChildren(
+  ...versions.map((version) => {
+    const option = document.createElement("option");
+    option.value = version;
+    option.textContent = version;
+    return option;
+  }),
+);
+versionSelect.value = versions.at(-1) ?? "";
+
 fillValues(form, fields, saved?.values ?? {});
 refreshVisibility();

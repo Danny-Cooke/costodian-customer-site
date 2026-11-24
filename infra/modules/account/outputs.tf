@@ -24,8 +24,53 @@ output "api_endpoint" {
 }
 
 output "table_name" {
-  description = "The table holding the account record."
+  description = "The one table every firm shared before each customer had its own. It stays only until the firms signed up before then have been moved out of it."
   value       = aws_dynamodb_table.this.name
+}
+
+output "customer_parameter_path" {
+  description = "The SSM path holding one label per customer number, one level deep."
+  value       = var.customer_parameter_path
+}
+
+output "versions_parameter_name" {
+  description = "The SSM parameter holding the product's version catalogue as a JSON list."
+  value       = aws_ssm_parameter.versions.name
+}
+
+output "customer_table_name_template" {
+  description = "A customer's table name with the customer number's placeholder where the number goes."
+  value       = local.customer_table_name_template
+}
+
+output "customer_table_arn_template" {
+  description = "A customer's table ARN with the customer number's placeholder where the number goes. What a session policy names."
+  value       = local.customer_table_arn_template
+}
+
+output "customer_key_alias_template" {
+  description = "A customer's key alias with the customer number's placeholder where the number goes, in the form the kms:ResourceAliases condition takes."
+  value       = local.customer_key_alias_template
+}
+
+output "customer_numbers" {
+  description = "Every customer number in the pool, claimed and free, lowest first."
+  value       = local.customer_numbers
+}
+
+output "customer_free_status" {
+  description = "The status word in a label that means nobody has taken that number."
+  value       = var.customer_free_status
+}
+
+output "customer_attribute" {
+  description = "The token claim holding a person's customer number."
+  value       = local.customer_attribute
+}
+
+output "customer_data_role_arn" {
+  description = "The role a function assumes, with a session policy for one customer, to reach that customer's table."
+  value       = aws_iam_role.customer_data.arn
 }
 
 output "key_arn" {

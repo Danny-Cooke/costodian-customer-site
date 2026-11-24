@@ -7,7 +7,7 @@
   <form novalidate>
     {{ ui.error_summary(forms.messages) }}
     {% for f in fields %}
-    {{ ui.field(f, site.rule_kinds) }}
+    {{ ui.field(f) }}
     {% endfor %}
     <p class="actions">
       <button type="submit" class="button large">{{ button }}</button>

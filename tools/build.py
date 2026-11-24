@@ -26,15 +26,14 @@ SITE = ROOT / "site"
 CONFIG_DIR = SITE / "config"
 TEMPLATES = SITE / "templates"
 STATIC = SITE / "static"
-RULES = SITE / "data" / "rules.generated.json"
 # The values shared with Terraform. Another environment's file is chosen by
 # setting PLATFORM_FILE to its path.
 PLATFORM_FILE_VARIABLE = "PLATFORM_FILE"
 DEFAULT_PLATFORM_FILE = ROOT / "infra" / "envs" / "dev" / "platform.tfvars.json"
 PRODUCT_NAME_KEY = "product_name"
+INITIAL_VERSIONS_KEY = "initial_versions"
 STATIC_URL = "/static"
 INDEX = "index.html"
-POSITION_PREFIX = "position_"
 PAGE_DATA_ID = "page-data"
 
 Field = dict[str, Any]
@@ -75,7 +74,6 @@ def apply_override(config: dict[str, Any], assignment: str) -> None:
 OPTIONAL_KEYS: dict[str, Any] = {
     "required": False,
     "help": "",
-    "rule": None,
     "inputmode": "",
     "autocomplete": "",
     "max_length": None,
@@ -126,6 +124,11 @@ def prepare(items: list[dict[str, Any]], site: dict[str, Any]) -> list[dict[str,
                 {"value": value, "label": choice["label"], "hint": choice.get("summary", "")}
                 for value, choice in lookup(site, key).items()
             ]
+        key = item.pop("options_from", None)
+        if key is not None:
+            # The choices are read when the page is used, so that a new one needs
+            # no rebuild. The ones known at build time are what a preview shows.
+            item["options"] = [{"value": value, "label": value} for value in lookup(site, key)]
         key = item.pop("default_key", None)
         if key is not None:
             item["default"] = lookup(site, key)
@@ -191,43 +194,6 @@ def expand(fields: list[Field], forms: dict[str, Any]) -> tuple[list[Field], lis
     return tree, flat, groups
 
 
-def position_fields(legal_aid: dict[str, Any], rules: dict[str, Any]) -> list[Field]:
-    """One question per rule that is not fixed, from the register copy plus this site's wording."""
-    copy_by_rule: dict[str, Any] = legal_aid["positions"]
-    rule_ids = [rule["id"] for rule in rules["rules"]]
-    unknown = sorted(set(copy_by_rule) - set(rule_ids))
-    if unknown:
-        raise BuildError(f"forms.json has wording for rules that are not in the register copy: {unknown}")
-
-    fields: list[Field] = []
-    for rule in rules["rules"]:
-        wording = copy_by_rule.get(rule["id"])
-        if wording is None:
-            raise BuildError(f"rule {rule['id']} has no question wording in forms.json")
-        field: Field = {
-            "id": f"{POSITION_PREFIX}{rule['id']}",
-            "label": wording["question"],
-            "rule": {key: rule.get(key, "") for key in ("id", "title", "source", "text", "note", "kind")},
-        }
-        if wording.get("per_case"):
-            field.update(type="note", text=legal_aid["per_case_note"])
-        elif "number" in wording:
-            field.update(type="number", required=True, **wording["number"])
-        else:
-            options = rule.get("options", [])
-            labels = wording.get("options", {})
-            if not options or set(options) != set(labels):
-                raise BuildError(f"rule {rule['id']}: the option wording does not match the register's options")
-            field.update(
-                type="radio",
-                required=True,
-                default=rule.get("default"),
-                options=[{"value": option, "label": labels[option]} for option in options],
-            )
-        fields.append(field)
-    return fields
-
-
 def with_condition(fields: list[Field], condition: dict[str, Any] | None) -> list[Field]:
     """A section's own condition applies to every field in it that has none."""
     if condition:
@@ -238,7 +204,7 @@ def with_condition(fields: list[Field], condition: dict[str, Any] | None) -> lis
     return fields
 
 
-def build_forms(forms: dict[str, Any], rules: dict[str, Any], site: dict[str, Any]) -> dict[str, Any]:
+def build_forms(forms: dict[str, Any], site: dict[str, Any]) -> dict[str, Any]:
     signup_steps = []
     for step in prepare(forms["signup"]["steps"], site):
         tree, flat, groups = expand(step["fields"], forms)
@@ -252,7 +218,7 @@ def build_forms(forms: dict[str, Any], rules: dict[str, Any], site: dict[str, An
     sections = []
 
     def add_section(source: dict[str, Any], fields: list[Field], kind: str = "fields") -> None:
-        tree, flat, groups = expand(fields, forms)
+        tree, flat, groups = expand(prepare(fields, site), forms)
         condition = source.get("show_if")
         with_condition(tree, condition)
         with_condition(flat, condition)
@@ -272,8 +238,6 @@ def build_forms(forms: dict[str, Any], rules: dict[str, Any], site: dict[str, An
     add_section({**company["funding"], "id": "funding"}, company["funding"]["fields"])
     for section in company["sections"]:
         add_section(section, section["fields"])
-    add_section({**company["legal_aid"], "id": "legal_aid"}, position_fields(company["legal_aid"], rules), "positions")
-    add_section({**company["private"], "id": "private"}, company["private"]["fields"])
 
     agreement_tree, agreement_flat, _ = expand(forms["agreement"]["fields"], forms)
 
@@ -290,7 +254,6 @@ def build_forms(forms: dict[str, Any], rules: dict[str, Any], site: dict[str, An
             "sections": sections,
             "funding_ids": [field["id"] for field in company["funding"]["fields"]],
         },
-        "register_version": rules["register_version"],
     }
 
 
@@ -354,7 +317,8 @@ def page_data(page: dict[str, Any], site: dict[str, Any], forms: dict[str, Any])
             for section in company["sections"]
         ]
         data["fundingIds"] = company["funding_ids"]
-        data["registerVersion"] = forms["register_version"]
+        data["versions"] = site["versions"]
+        data["versionField"] = site["version_field"]
     return data
 
 
@@ -388,14 +352,17 @@ def load_site(overrides: list[str] | tuple[str, ...] = ()) -> dict[str, Any]:
     """
     site = load_json(CONFIG_DIR / "site.json")
     # The product's name is declared once, in the values Terraform also reads.
-    site["product"]["name"] = load_json(platform_file())[PRODUCT_NAME_KEY]
+    platform = load_json(platform_file())
+    site["product"]["name"] = platform[PRODUCT_NAME_KEY]
+    # The versions a firm can run begin with the ones the platform starts with.
+    site["versions"] = platform[INITIAL_VERSIONS_KEY]
     for assignment in overrides:
         apply_override(site, assignment)
     return interpolate(site, Environment(undefined=StrictUndefined), site)
 
 
 def load_forms(site: dict[str, Any]) -> dict[str, Any]:
-    return build_forms(load_json(CONFIG_DIR / "forms.json"), load_json(RULES), site)
+    return build_forms(load_json(CONFIG_DIR / "forms.json"), site)
 
 
 def build(out: Path, overrides: list[str]) -> list[Path]:

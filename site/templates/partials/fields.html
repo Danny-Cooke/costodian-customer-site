@@ -1,14 +1,4 @@
 {# One macro renders every kind of field from its definition in forms.json. #}
-{% macro rule_box(rule, kinds) %}
-<details class="rule">
-  <summary>{{ kinds[rule.kind] }}: see the rule</summary>
-  <p class="rule-title">{{ rule.title }}</p>
-  <blockquote>{{ rule.text }}</blockquote>
-  <p class="rule-source">{{ rule.source }}</p>
-  {% if rule.note %}<p>{{ rule.note }}</p>{% endif %}
-</details>
-{% endmacro %}
-
 {% macro help_and_error(f, fid) %}
   {% if f.help %}<p class="help" id="{{ fid }}-help">{{ f.help }}</p>{% endif %}
   <p class="error" id="{{ fid }}-error" data-error hidden></p>
@@ -16,20 +6,19 @@
 
 {% macro described(f, fid) %}aria-describedby="{% if f.help %}{{ fid }}-help {% endif %}{{ fid }}-error"{% endmacro %}
 
-{% macro field(f, kinds, prefix='') %}
+{% macro field(f, prefix='') %}
 {% set fid = prefix ~ f.id %}
 {% if f.type == 'group' %}
 <fieldset class="group" data-field="{{ f.id }}">
   <legend>{{ f.label|ucfirst }}</legend>
   {% for child in f.fields %}
-  {{ field(child, kinds, prefix) }}
+  {{ field(child, prefix) }}
   {% endfor %}
 </fieldset>
 {% elif f.type == 'note' %}
 <div class="field note" data-field="{{ f.id }}">
   <p class="field-label">{{ f.label|ucfirst }}</p>
   <p>{{ f.text }}</p>
-  {% if f.rule %}{{ rule_box(f.rule, kinds) }}{% endif %}
 </div>
 {% elif f.type == 'checkbox' %}
 <div class="field check" data-field="{{ f.id }}">
@@ -50,7 +39,6 @@
   </div>
   {% endfor %}
   <p class="error" id="{{ fid }}-error" data-error hidden></p>
-  {% if f.rule %}{{ rule_box(f.rule, kinds) }}{% endif %}
 </fieldset>
 {% elif f.type == 'select' %}
 <div class="field" data-field="{{ f.id }}">
@@ -73,7 +61,6 @@
     {%- if f.max_length %} maxlength="{{ f.max_length }}"{% endif %}
     {%- if f.default is not none %} value="{{ f.default }}"{% endif %}>
   {{ help_and_error(f, fid) }}
-  {% if f.rule %}{{ rule_box(f.rule, kinds) }}{% endif %}
 </div>
 {% endif %}
 {% endmacro %}

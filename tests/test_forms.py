@@ -7,7 +7,6 @@ import copy
 import pytest
 
 import build as build_tool
-import sync_rules
 
 
 def test_an_address_becomes_one_group_of_parts_that_inherit_its_condition(forms: dict) -> None:
@@ -40,57 +39,22 @@ def test_an_unknown_format_is_refused(forms: dict) -> None:
         build_tool.expand([{"id": "x", "label": "x", "type": "text", "format": "no_such"}], forms)
 
 
-def test_every_rule_a_firm_decides_has_a_question(forms: dict, rules: dict) -> None:
-    fields = build_tool.position_fields(forms["company"]["legal_aid"], rules)
-    assert [field["rule"]["id"] for field in fields] == [rule["id"] for rule in rules["rules"]]
-    for field, rule in zip(fields, rules["rules"], strict=True):
-        if field["type"] == "radio":
-            assert [option["value"] for option in field["options"]] == rule["options"]
-            assert field["default"] == rule["default"]
-
-
-def test_a_rule_with_no_wording_stops_the_build(forms: dict, rules: dict) -> None:
-    legal_aid = copy.deepcopy(forms["company"]["legal_aid"])
-    legal_aid["positions"].pop(rules["rules"][0]["id"])
-    with pytest.raises(build_tool.BuildError):
-        build_tool.position_fields(legal_aid, rules)
-
-
-def test_wording_for_a_rule_that_is_not_in_the_register_stops_the_build(forms: dict, rules: dict) -> None:
-    legal_aid = copy.deepcopy(forms["company"]["legal_aid"])
-    legal_aid["positions"]["NO-SUCH-RULE"] = {"question": "?", "per_case": True}
-    with pytest.raises(build_tool.BuildError):
-        build_tool.position_fields(legal_aid, rules)
-
-
-def test_option_wording_that_differs_from_the_register_stops_the_build(forms: dict, rules: dict) -> None:
-    changed = copy.deepcopy(rules)
-    with_options = next(rule for rule in changed["rules"] if rule.get("options"))
-    with_options["options"].append("a_new_option")
-    with pytest.raises(build_tool.BuildError):
-        build_tool.position_fields(forms["company"]["legal_aid"], changed)
-
-
-def test_a_section_condition_reaches_every_field_in_it(forms: dict, rules: dict) -> None:
-    built = build_tool.build_forms(forms, rules, build_tool.load_site())
-    legal_aid = next(section for section in built["company"]["sections"] if section["id"] == "legal_aid")
-    assert legal_aid["show_if"] == forms["company"]["legal_aid"]["show_if"]
-    assert all(field["show_if"] == legal_aid["show_if"] for field in legal_aid["flat"])
-
-
-def test_the_rule_copy_keeps_only_rules_that_are_not_fixed(tmp_path) -> None:
-    register = tmp_path / "register.yaml"
-    register.write_text(
-        "version: '1'\nrules:\n"
-        "  - {id: A, title: a, source: s, text: t, kind: fixed}\n"
-        "  - {id: B, title: b, source: s, text: t, kind: judgment, options: [x, y], default: x}\n",
-        encoding="utf-8",
+def test_a_section_condition_reaches_every_field_in_it(forms: dict) -> None:
+    condition = {"field": "funding_private", "equals": True}
+    changed = copy.deepcopy(forms)
+    changed["company"]["sections"].append(
+        {"id": "extra", "title": "Extra", "show_if": condition, "fields": [{"id": "x", "label": "x", "type": "text"}]}
     )
-    data = sync_rules.extract(register)
-    assert data["register_version"] == "1"
-    assert [rule["id"] for rule in data["rules"]] == ["B"]
+    built = build_tool.build_forms(changed, build_tool.load_site())
+    extra = next(section for section in built["company"]["sections"] if section["id"] == "extra")
+    assert extra["show_if"] == condition
+    assert all(field["show_if"] == condition for field in extra["flat"])
 
 
-def test_the_committed_rule_copy_holds_no_fixed_rule(rules: dict) -> None:
-    assert rules["register_version"]
-    assert rules["rules"] and all(rule["kind"] != sync_rules.FIXED for rule in rules["rules"])
+def test_choices_read_when_the_page_is_used_start_from_the_ones_known_at_build(forms: dict) -> None:
+    site = build_tool.load_site()
+    built = build_tool.build_forms(forms, site)
+    fields = [field for section in built["company"]["sections"] for field in section["flat"]]
+    version = next(field for field in fields if field["id"] == site["version_field"])
+    assert [option["value"] for option in version["options"]] == site["versions"]
+    assert site["versions"], "the platform starts with at least one version"
