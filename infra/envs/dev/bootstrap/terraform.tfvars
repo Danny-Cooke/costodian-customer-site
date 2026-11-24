@@ -285,6 +285,7 @@ service_roles = {
           "cognito-idp:SetUserPoolMfaConfig",
           "cognito-idp:TagResource",
           "cognito-idp:UntagResource",
+          "cognito-idp:AddCustomAttributes",
           "cognito-idp:UpdateUserPool",
           "cognito-idp:UpdateUserPoolClient",
         ]
