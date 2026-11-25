@@ -1,5 +1,5 @@
 [project]
-name = "draftsman-customer-site"
+name = "customer-site"
 version = "0.1.0"
 description = "The public site and customer sign-up portal"
 requires-python = ">=3.12"
