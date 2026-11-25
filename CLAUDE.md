@@ -1,13 +1,18 @@
-# draftsman-customer-site
+# Customer site and sign-up portal
 
-The public site and customer sign-up portal for the product, the legal aid bill
-drafting product. The product itself, and the design and decision record for both,
-live in the sibling repository `automation-portal` (`draftsman-poc/` and
-`.claude/`). Read that knowledge base before designing anything here; this
-repository's `.claude/` holds only what applies to this code.
+The public site and customer sign-up portal for the product: sign-up, sign-in, My
+account, the customer record, and the hand-off that will create a customer's account.
+The product's name is declared once, in `infra/envs/dev/platform.tfvars.json`, and is
+not written anywhere else in the code.
 
-> **Status:** preview. A static site with working forms that save nothing. No
-> API, no database, no sign-in, no payment.
+Everything about this portal (road map, decisions, research) is in this repository's
+`.claude/`; start at `.claude/README.md`. The sibling repository `automation-portal`
+holds the wider product and the SRA and legal aid research, and is referred to from
+here where needed.
+
+> **Status:** live, built by the GitHub workflows. Sign-up is real and free. The
+> preview banner stays up while the README lists features stated on the site and not
+> yet built.
 
 ## Rules
 
@@ -41,11 +46,14 @@ repository's `.claude/` holds only what applies to this code.
 ## Ways of working with Dan
 
 - Short answers. Plan before build; build on an explicit go.
-- Nothing is committed unless Dan says so, and Dan decides when to push.
+- Changes go through a pull request; a merge to `main` deploys. Dan decides what is
+  built and when it goes live.
 - Run the tests and `terraform validate` before calling work done, and say
   plainly what was and was not verified.
-- Decisions and design go in `automation-portal/.claude/`; a short copy of what
-  applies here goes in this repository's `.claude/`.
+- Decisions, design and research for this portal go in this repository's `.claude/`,
+  with frontmatter, linked from `.claude/README.md`.
+- Infrastructure is applied by the workflows. The only thing run from a person's machine
+  is `scripts/seed.sh`, once.
 
 ## Where things go
 
@@ -54,5 +62,5 @@ repository's `.claude/` holds only what applies to this code.
 | What this is and how to run it | `README.md` |
 | First-time AWS and GitHub set-up | `runbooks/bootstrap.md` |
 | Deploying, and the redirect from the main website | `runbooks/deploy.md` |
-| The plan and decisions that apply to this repository | `.claude/` |
-| The full design and decision record | `../automation-portal/.claude/` |
+| Road map, decisions and research for this portal | `.claude/` |
+| The wider product, and the SRA and legal aid research | `../automation-portal/.claude/` |

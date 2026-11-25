@@ -63,8 +63,8 @@ runbooks/                bootstrap and deploy
 ## Working on it
 
 ```bash
-python3 -m venv ~/.venvs/draftsman-site
-. ~/.venvs/draftsman-site/bin/activate
+python3 -m venv ~/.venvs/customer-site
+. ~/.venvs/customer-site/bin/activate
 pip install -e ".[dev]"
 npm ci                                   # test tooling only
 
