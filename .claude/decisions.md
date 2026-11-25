@@ -120,3 +120,13 @@ Agreed in outline; not built. Detail in `context/account-factory-hand-off.md`.
   lookup will be rate-limited and give one error for every kind of wrong sign-in.
 - **Claude.** A dormant customer keeps everything and their retention clock does not
   run. Dormant and left are held: nothing the customer saves changes them.
+
+## 25 November 2026: where this repository belongs
+
+- **Dan.** He is building a full minimum viable product. This repository is the
+  customer site and will always live in the same AWS account as the Account Factory, in
+  the production organisation.
+- **Dan.** It must be deployable again from a different repository, into a different
+  account, with a different GitHub sign-in. Assessed the same day: yes as a second `dev`;
+  production needs the environment made a parameter (road map, "Portability").
+- **Dan.** People see the UID, never a customer number.
