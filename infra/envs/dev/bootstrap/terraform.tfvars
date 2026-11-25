@@ -15,8 +15,7 @@
 # The Destroy workflow runs as these same roles, not as an administrator, so
 # each one can delete and unprotect what it creates as well as create it.
 
-github_owner      = "Danny-Cooke"
-github_repository = "draftsman-customer-site"
+github_owner = "Danny-Cooke"
 
 # Three GitHub environments: a pull request can only reach the read-only plan
 # role, only a deploy from main can reach the role that may assume the service

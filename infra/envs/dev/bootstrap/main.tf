@@ -92,7 +92,7 @@ locals {
 
   oidc_host         = trimprefix(var.github_oidc_url, "https://")
   oidc_provider_arn = data.aws_iam_openid_connect_provider.github.arn
-  repository_path   = "${var.github_owner}/${var.github_repository}"
+  repository_path   = "${var.github_owner}/${local.repository}"
 
   # How GitHub names this repository in the tokens it issues. A repository set
   # to immutable subjects is named by owner and repository id as well as by

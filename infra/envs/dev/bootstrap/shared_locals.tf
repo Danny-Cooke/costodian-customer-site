@@ -5,17 +5,22 @@ locals {
   # name: lower-cased, anything outside a-z0-9 folded to a hyphen, then what
   # this repository builds: a product named "Example Co" with the suffix
   # "site" gives the project slot "example-co-site".
-  project = trim(join("-", [
-    replace(lower(var.product_name), "/[^a-z0-9]+/", "-"),
-    var.project_suffix,
-  ]), "-")
+  product_slug = trim(replace(lower(var.product_name), "/[^a-z0-9]+/", "-"), "-")
+
+  project = trim(join("-", [local.product_slug, var.project_suffix]), "-")
+
+  # The repository's name follows the product's name in the same way, so that a
+  # change of name is still one value. Renaming the product means renaming the
+  # repository to match, then running the seed and the Bootstrap workflow, because
+  # the roles trust the repository by name.
+  repository = trim(join("-", [local.product_slug, var.repository_suffix]), "-")
 
   # Declared once here and applied by every provider's default_tags.
   default_tags = {
     Product     = var.product_name
     Project     = local.project
     Environment = var.platform.environment
-    Repository  = var.repository
+    Repository  = local.repository
     ManagedBy   = var.managed_by
     Owner       = var.owner
   }
