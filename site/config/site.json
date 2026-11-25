@@ -224,7 +224,9 @@
     "done": "Done",
     "to_do": "To do",
     "blank": "Not given",
-    "covered": "Covered"
+    "covered": "Covered",
+    "uid": "UID",
+    "uid_long": "unique ID"
   },
   "identity": {
     "person_name_field": "person_name",

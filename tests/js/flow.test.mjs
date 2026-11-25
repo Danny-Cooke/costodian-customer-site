@@ -345,7 +345,7 @@ test("an acceptance of an older version is asked for again", async () => {
   assert.equal(page.one("[data-accepted]").hidden, true);
 });
 
-test("a preview has no customer number to show", async () => {
+test("a preview has no UID to show", async () => {
   const page = await open("portal", storageWith(SIGNED_UP));
   assert.equal(page.one("[data-uid-panel]").hidden, true);
 });
