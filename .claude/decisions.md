@@ -92,3 +92,7 @@ Agreed in outline; not built. Detail in `context/account-factory-hand-off.md`.
 
 - **Dan.** Everything about the sign-up portal (context, road map) is kept in this
   repository. References to the product's earlier name are replaced.
+- **Dan.** The repository is renamed to follow the product's name. Done the same day:
+  the name is now composed from the product's name and a suffix, not typed; the seed was
+  re-run and the Bootstrap and Site workflows run, because the roles trust the
+  repository by name.
