@@ -9,9 +9,10 @@
 # credentials from the customer data role for each request, with a session
 # policy that narrows them to the one customer the signed-in person belongs to.
 #
-# The table here is the one every firm shared before each had its own. It stays
-# only until the firms that signed up before then have been moved out of it, and
-# only the enrol function can still read it.
+# The table here is the registry of customer UIDs: one entry for every UID ever
+# issued, keyed by the UID, so that a UID is never issued twice. It holds which
+# customer number a UID belongs to and nothing about the customer. Only the
+# enrol function can write to it.
 #
 # There is no bucket, queue or function here that could hold an identity
 # document. The API is reached through the site's CloudFront distribution, so it
@@ -222,12 +223,13 @@ resource "aws_kms_alias" "this" {
   target_key_id = aws_kms_key.this.key_id
 }
 
-# ------------------------------------------------- the old shared table
+# ------------------------------------------------------ the UID registry
 
-# Every firm's account record was here before each customer had a table of its
-# own. It stays, with its deletion protection, until the firms that signed up
-# before then have been moved out of it; after that it is removed from this
-# module and nothing else changes.
+# One entry for every UID ever issued. A UID is claimed by a write that only
+# succeeds if the entry is not there, which is what makes a UID unique; an
+# entry is never removed, so a UID is never issued again after a customer has
+# left. (This table held every firm's record before each customer had a table
+# of its own; it was emptied and is now the registry.)
 resource "aws_dynamodb_table" "this" {
   provider = aws.data
 
@@ -514,7 +516,7 @@ data "aws_iam_policy_document" "function" {
   # function that moves a firm out of it holds these, and both statements go
   # when that table does.
   dynamic "statement" {
-    for_each = length(each.value.legacy_table_actions) > 0 ? [each.value.legacy_table_actions] : []
+    for_each = length(each.value.registry_actions) > 0 ? [each.value.registry_actions] : []
 
     content {
       sid       = "ReadTheOldSharedTableToMoveFirmsOutOfIt"
@@ -529,7 +531,7 @@ data "aws_iam_policy_document" "function" {
   # allows the key's use through DynamoDB only, so this grant is the narrower of
   # the two and the function cannot decrypt anything out of band.
   dynamic "statement" {
-    for_each = length(each.value.legacy_table_actions) > 0 ? [var.legacy_key_actions] : []
+    for_each = length(each.value.registry_actions) > 0 ? [var.registry_key_actions] : []
 
     content {
       sid       = "UseTheOldSharedTablesKey"
@@ -580,8 +582,7 @@ resource "aws_lambda_function" "this" {
   # Every function is given the pool's id now, because every request reads the
   # customer number the pool holds; what a function may do with the pool is its
   # role's business, and a function with no pool actions can do nothing with it.
-  # The old shared table is named only to the function that moves firms out of
-  # it.
+  # The registry is named only to the function that issues UIDs.
   environment {
     variables = merge(
       {
@@ -599,7 +600,7 @@ resource "aws_lambda_function" "this" {
         VERSIONS_PARAMETER           = aws_ssm_parameter.versions.name
         VERSION_TAG_PATTERN          = var.version_tag_pattern
       },
-      length(each.value.legacy_table_actions) > 0 ? { LEGACY_TABLE_NAME = aws_dynamodb_table.this.name } : {},
+      length(each.value.registry_actions) > 0 ? { REGISTRY_TABLE_NAME = aws_dynamodb_table.this.name } : {},
     )
   }
 

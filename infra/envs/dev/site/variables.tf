@@ -183,8 +183,8 @@ variable "customer_data_key_actions" {
   type        = list(string)
 }
 
-variable "legacy_key_actions" {
-  description = "What a function that still reads the old shared table may do with that table's key."
+variable "registry_key_actions" {
+  description = "What a function with registry_actions may do with the key the UID registry table is encrypted with."
   type        = list(string)
 }
 
@@ -338,13 +338,13 @@ variable "token_validity_units" {
 variable "functions" {
   description = "The sign-up functions: handler, the routes each answers, which may be none, and the exact actions each one's own role is built from. data_actions are the only ones not in the role: they are what the function asks for in the session policy it passes when it takes credentials for one customer's table, and a function with none of them cannot assume that role at all."
   type = map(object({
-    handler              = string
-    routes               = list(string)
-    data_actions         = list(string)
-    parameter_actions    = list(string)
-    pool_actions         = list(string)
-    legacy_table_actions = list(string)
-    versions_actions     = optional(list(string), [])
+    handler           = string
+    routes            = list(string)
+    data_actions      = list(string)
+    parameter_actions = list(string)
+    pool_actions      = list(string)
+    registry_actions  = list(string)
+    versions_actions  = optional(list(string), [])
   }))
 }
 

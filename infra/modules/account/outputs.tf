@@ -24,7 +24,7 @@ output "api_endpoint" {
 }
 
 output "table_name" {
-  description = "The one table every firm shared before each customer had its own. It stays only until the firms signed up before then have been moved out of it."
+  description = "The registry of customer UIDs: one entry for every UID ever issued, so that none is issued twice. It holds no customer data."
   value       = aws_dynamodb_table.this.name
 }
 

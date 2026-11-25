@@ -39,6 +39,7 @@ const accountOf = (member, more = {}) => ({
     people: [OWNER, ADMIN],
     changes: [],
     versions: ["v1.0", "v1.1"],
+    uid: "483920",
     ...more,
   },
 });
@@ -449,4 +450,29 @@ test("the versions on offer come from the API, and a firm's own choice is shown"
   await settle();
   assert.equal(net.requests.at(-1).body.values.product_version, "v1.1");
   assert.equal("registerVersion" in net.requests.at(-1).body, false);
+});
+
+test("my account shows the customer number the firm signs in to its portal with", async () => {
+  const net = network({ [`GET ${data.api.account}`]: () => accountOf(OWNER) });
+  const page = await openLive("portal", sessionWith(memoryStorage()), net);
+  assert.equal(page.one("[data-uid-panel]").hidden, false);
+  assert.equal(page.one("[data-uid]").textContent, "483920");
+  assert.equal(net.requests.length, 1, "a customer who has a number is not asked for one again");
+});
+
+test("a customer from before customer numbers is given one when they sign in", async () => {
+  let issued = false;
+  const net = network({
+    [`GET ${data.api.account}`]: () => accountOf(OWNER, { uid: issued ? "207518" : null }),
+    [`POST ${data.api.firm}`]: () => {
+      issued = true;
+      return { body: { member: { role: "owner" }, renew: false } };
+    },
+  });
+  const page = await openLive("portal", sessionWith(memoryStorage()), net);
+  assert.deepEqual(
+    net.requests.map((request) => `${request.method} ${request.url}`),
+    [`GET ${data.api.account}`, `POST ${data.api.firm}`, `GET ${data.api.account}`],
+  );
+  assert.equal(page.one("[data-uid]").textContent, "207518");
 });

@@ -298,7 +298,8 @@
   "customer_statuses": {
     "signed_up": "signed up",
     "complete": "set-up complete",
-    "left": "left"
+    "left": "left",
+    "dormant": "dormant"
   },
   "customer_label": {
     "name": "name",
@@ -322,5 +323,15 @@
   },
   "customer_label_answers": {
     "version": "product_version"
-  }
+  },
+  "uid": {
+    "digits": 6,
+    "attempts": 20,
+    "issued": "issued",
+    "retired": "retired"
+  },
+  "customer_statuses_held": [
+    "left",
+    "dormant"
+  ]
 }

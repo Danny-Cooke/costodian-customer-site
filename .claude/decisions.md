@@ -96,3 +96,26 @@ Agreed in outline; not built. Detail in `context/account-factory-hand-off.md`.
   the name is now composed from the product's name and a suffix, not typed; the seed was
   re-run and the Bootstrap and Site workflows run, because the roles trust the
   repository by name.
+
+## 25 November 2026: the UID, sign-in for the portal, and dormant customers
+
+- **Dan.** The customer site's users are separate from the portal's. The customer site
+  has one central pool. Each customer's portal has its own pool in their own AWS
+  account, created at Build. The person who signed up is invited to it as overall
+  administrator. One email address belongs to one customer for now.
+- **Dan.** The portal's shared sign-in page asks for the customer number, email and
+  password, and directs the sign-in to that customer's own pool.
+- **Dan.** Every customer has a UID: six random digits, never duplicated, never changed,
+  stored in the table and on the label and passed to the Account Factory; called `uid`
+  in code. When a customer leaves, the UID and the customer number are retired.
+- **Dan.** A registry table keeps track of UIDs.
+- **Dan.** A `dormant` status for a customer who has stopped their subscription for a
+  time without leaving.
+- **Claude.** The registry is keyed on the UID, because uniqueness is only enforced on a
+  key. It reuses the emptied shared table. The UID is six digits from 100000, so it never
+  starts with a nought. Issued UIDs stay in the registry for ever. The UID names
+  everything made at Build; the sequential number stays inside the sign-up system. The
+  UID is shown to customers as "customer number". It is an address, not a secret: the
+  lookup will be rate-limited and give one error for every kind of wrong sign-in.
+- **Claude.** A dormant customer keeps everything and their retention clock does not
+  run. Dormant and left are held: nothing the customer saves changes them.

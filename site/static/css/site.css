@@ -903,3 +903,11 @@ input.short {
   font-weight: 600;
   margin-bottom: 0.25rem;
 }
+
+/* The customer number, shown large enough to read out or copy down. */
+.uid {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0.25rem 0 0.5rem;
+}

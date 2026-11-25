@@ -11,7 +11,8 @@ Agreed in outline with Dan on 24 and 25 November 2026. **Nothing here is built.*
 
 ## The principle
 
-The infrastructure behind a customer only ever knows the **customer number**. A firm can
+The infrastructure behind a customer only ever knows the customer by number: the **UID**
+in their own account, the sequential customer number inside the sign-up system. A firm can
 change its name, its phone number or its people and nothing is renamed or rebuilt.
 
 | Kind of data | Examples | Where it lives | What a change triggers |
@@ -30,13 +31,14 @@ what a customer typed.
 aft-account-request/terraform/
   main.tf            written once; reads every file in customers/
   customers/
-    0001.json        { "customer": "0001", "portal": "practice", "version": "v1.0" }
+    483920.json      { "uid": "483920", "customer": "0001", "portal": "practice", "version": "v1.0" }
 ```
 
 Per customer, the fixed file asks for:
 
-- **Account name** `<product>-<environment>-<number>`. No firm name: firms rename, and a
-  firm's name should not sit in an account name.
+- **Account name** `<product>-<environment>-<uid>`. The UID names everything made at
+  Build; the sequential customer number stays inside the sign-up system. No firm name:
+  firms rename, and a firm's name should not sit in an account name.
 - **Root email** one per account, ours, never reused. Scheme not decided: plus
   addressing on one mailbox (our notes say AWS's own examples use it and nothing says it
   is supported; whether the mail host delivers it is untested), or an alias per account.
@@ -44,7 +46,7 @@ Per customer, the fixed file asks for:
   same on every account. Never the customer. Costodian is run as a managed service.
 - **Customisations** chosen by the portal: one set for the solicitor types, one for the
   costs types.
-- **Tags and custom fields** customer number, portal, version. Not the slug: if a name
+- **Tags and custom fields** UID, customer number, portal, version. Not the slug: if a name
   ever reached a resource name, a rename would mean replacing the resource.
 
 Removing a file does not close an account. Closing is a separate, deliberate step.
@@ -84,6 +86,12 @@ Account Factory finishes or fails for the account
 - **The same workflow runs for every customer once a day** as the safety net for a
   missed event or a file edited by hand.
 - **The request repository checks each file's shape**, so a bad file fails the plan.
+
+## What Build also creates (agreed 25 November 2026)
+
+A user pool for the customer's portal, in the customer's own account, and an invitation
+to the person who signed up as its first user and overall administrator. See the road
+map, "The portal's sign-in".
 
 ## Approval
 
