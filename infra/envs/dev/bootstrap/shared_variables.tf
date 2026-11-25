@@ -55,8 +55,8 @@ variable "services" {
   type        = list(string)
 }
 
-variable "repository" {
-  description = "The repository this infrastructure is defined in. Used as a tag."
+variable "repository_suffix" {
+  description = "What this repository builds, as it appears in the repository's name after the product's name: a product named \"Example Co\" with the suffix \"customer-site\" lives in the repository \"example-co-customer-site\"."
   type        = string
 }
 

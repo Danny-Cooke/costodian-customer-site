@@ -3,11 +3,6 @@ variable "github_owner" {
   type        = string
 }
 
-variable "github_repository" {
-  description = "The repository whose workflows may assume the entry roles."
-  type        = string
-}
-
 variable "github_environments" {
   description = "The GitHub environment each role is tied to. A job can only assume the role of its own environment: a pull request reaches plan, a deploy from main reaches deploy, and the Bootstrap and Destroy workflows reach the seed's bootstrap role. The bootstrap entry is not a role of this stack - the seed owns that role and trusts that one environment - and scripts/seed.sh and scripts/names.sh read it from here."
   type = object({
