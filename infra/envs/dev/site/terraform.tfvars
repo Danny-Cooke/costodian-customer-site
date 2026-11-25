@@ -145,9 +145,9 @@ customer_data_key_actions = [
   "kms:GenerateDataKey",
 ]
 
-# What the function that moves firms out of the old shared table may do with
-# that table's key. It reads and deletes, so it decrypts and never writes.
-legacy_key_actions = ["kms:Decrypt"]
+# What the function that issues customer UIDs may do with the key the registry
+# table is encrypted with. It reads and writes entries, so it does both.
+registry_key_actions = ["kms:Decrypt", "kms:GenerateDataKey"]
 
 # ---------------------------------------------------- the version catalogue
 #
@@ -265,13 +265,13 @@ token_validity_units = {
 # they are the narrowest of the two and the role is the wider.
 functions = {
   read = {
-    handler              = "handler.read"
-    routes               = ["GET /api/account"]
-    data_actions         = ["dynamodb:Query", "dynamodb:GetItem"]
-    parameter_actions    = []
-    pool_actions         = []
-    legacy_table_actions = []
-    versions_actions     = ["ssm:GetParameter"]
+    handler           = "handler.read"
+    routes            = ["GET /api/account"]
+    data_actions      = ["dynamodb:Query", "dynamodb:GetItem"]
+    parameter_actions = []
+    pool_actions      = []
+    registry_actions  = []
+    versions_actions  = ["ssm:GetParameter"]
   }
   # The only function that takes a customer number: it lists the labels, claims
   # the lowest free one, writes that label, and tells the sign-in service which
@@ -286,26 +286,26 @@ functions = {
       "cognito-idp:AdminGetUser",
       "cognito-idp:AdminUpdateUserAttributes",
     ]
-    legacy_table_actions = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:DeleteItem"]
-    versions_actions     = ["ssm:GetParameter"]
+    registry_actions = ["dynamodb:GetItem", "dynamodb:PutItem"]
+    versions_actions = ["ssm:GetParameter"]
   }
   write = {
-    handler              = "handler.write"
-    routes               = ["PUT /api/account/{section}"]
-    data_actions         = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem"]
-    parameter_actions    = ["ssm:GetParameter", "ssm:PutParameter"]
-    pool_actions         = []
-    legacy_table_actions = []
-    versions_actions     = ["ssm:GetParameter"]
+    handler           = "handler.write"
+    routes            = ["PUT /api/account/{section}"]
+    data_actions      = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem"]
+    parameter_actions = ["ssm:GetParameter", "ssm:PutParameter"]
+    pool_actions      = []
+    registry_actions  = []
+    versions_actions  = ["ssm:GetParameter"]
   }
   accept = {
-    handler              = "handler.accept"
-    routes               = ["POST /api/account/agreement"]
-    data_actions         = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem"]
-    parameter_actions    = ["ssm:GetParameter", "ssm:PutParameter"]
-    pool_actions         = []
-    legacy_table_actions = []
-    versions_actions     = []
+    handler           = "handler.accept"
+    routes            = ["POST /api/account/agreement"]
+    data_actions      = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem"]
+    parameter_actions = ["ssm:GetParameter", "ssm:PutParameter"]
+    pool_actions      = []
+    registry_actions  = []
+    versions_actions  = []
   }
   # The only function that may create, remove or sign out a member. It cannot
   # change the pool itself, and it cannot read or write a customer's label.
@@ -323,21 +323,21 @@ functions = {
       "cognito-idp:AdminDeleteUser",
       "cognito-idp:AdminUserGlobalSignOut",
     ]
-    legacy_table_actions = []
-    versions_actions     = []
+    registry_actions = []
+    versions_actions = []
   }
   # The version catalogue. It answers no route: a version tag created in the
   # source repository is its only caller, and the catalogue is all it touches.
   # With no data_actions it is not trusted by the customer data role at all, so
   # no customer's table is reachable from it.
   catalogue = {
-    handler              = "handler.catalogue"
-    routes               = []
-    data_actions         = []
-    parameter_actions    = []
-    pool_actions         = []
-    legacy_table_actions = []
-    versions_actions     = ["ssm:GetParameter", "ssm:PutParameter"]
+    handler           = "handler.catalogue"
+    routes            = []
+    data_actions      = []
+    parameter_actions = []
+    pool_actions      = []
+    registry_actions  = []
+    versions_actions  = ["ssm:GetParameter", "ssm:PutParameter"]
   }
 }
 
@@ -348,8 +348,8 @@ lambda_runtime   = "python3.12"
 lambda_memory_mb = 256
 
 # A request is now a session from STS, then several calls to the customer's
-# table, and for enrol a walk of the pool's labels and, once, a firm moved out
-# of the old shared table. Ten seconds was tight for that; twenty is still far
+# table, and for enrol a walk of the pool's labels and a UID claimed in the
+# registry. Ten seconds was tight for that; twenty is still far
 # short of anything a person would wait for.
 lambda_timeout_seconds = 20
 

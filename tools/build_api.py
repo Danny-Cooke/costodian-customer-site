@@ -29,7 +29,10 @@ KEYS = {
     "member_prefix": "member#",
     "change_prefix": "change#",
     "agreement_prefix": "agreement#",
+    "uid": "uid",
 }
+# How entries are keyed in the registry of UIDs.
+REGISTRY_KEYS = {"uid_prefix": "UID#", "entry": "entry"}
 SCRIPTS = ("signup", "company", "agreements", "people")
 CONFIG_KEYS = {"agreements": "agreement"}
 PAGE_KEYS = ("steps", "types", "sections", "fundingIds", "versionField", "fields", "agreement", "inviteFields")
@@ -50,6 +53,9 @@ def api_config(site: dict[str, Any]) -> dict[str, Any]:
     config["permissions"] = site["permissions"]
     config["firstMemberRole"] = site["first_member_role"]
     config["customerStatuses"] = site["customer_statuses"]
+    config["customerStatusesHeld"] = [site["customer_statuses"][name] for name in site["customer_statuses_held"]]
+    config["uid"] = site["uid"]
+    config["registryKeys"] = REGISTRY_KEYS
     config["customerLabel"] = site["customer_label"]
     config["customerLabelAnswers"] = site["customer_label_answers"]
     config["account"] = site["account"]

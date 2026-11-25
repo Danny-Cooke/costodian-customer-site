@@ -18,6 +18,11 @@ for (const step of data.setupSteps) {
   badge.classList.toggle("done", done);
 }
 
+const uid = account?.state().uid;
+const uidPanel = document.querySelector("[data-uid-panel]");
+uidPanel.querySelector("[data-uid]").textContent = uid ?? "";
+uidPanel.hidden = !uid;
+
 const panel = document.querySelector("[data-account]");
 panel.querySelector('[data-when="waiting"]').hidden = status.ready;
 panel.querySelector('[data-when="ready"]').hidden = !status.ready;

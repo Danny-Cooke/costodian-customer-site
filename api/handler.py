@@ -134,6 +134,14 @@ def tokens() -> Any:
     return boto3.client("sts")
 
 
+@cache
+def registry() -> Any:
+    """Every UID ever issued, so that none is issued twice. Holds no customer data."""
+    import boto3
+
+    return boto3.resource("dynamodb").Table(os.environ["REGISTRY_TABLE_NAME"])
+
+
 def for_customer(template_variable: str, number: str) -> str:
     return os.environ[template_variable].replace(NUMBER_PLACEHOLDER, number)
 
@@ -281,8 +289,9 @@ def delete_after(left_on: str | None, last_case_completed_on: str | None) -> str
 def write_label(number: str, **changes: Any) -> dict[str, Any]:
     """Updates a customer's label, and writes it only when something has changed."""
     before = read_label(number)
-    if before.get("status") == config()["customerStatuses"]["left"]:
-        # A customer who has left stays marked as left, whatever is saved after.
+    if before.get("status") in config()["customerStatusesHeld"]:
+        # A customer who is dormant or has left stays so, whatever is saved
+        # after: only an operator moves a customer into or out of those.
         changes.pop("status", None)
     after = {**before, **changes, "customer": number}
     after["delete_after"] = delete_after(after.get("left_on"), after.get("last_case_completed_on"))
@@ -656,6 +665,41 @@ def claim_a_number(person: dict[str, str]) -> tuple[str, Any]:
     raise refuse(409, "no_capacity")
 
 
+def issue_uid(number: str) -> str:
+    """A new UID for a customer: random, and unlike any issued before.
+
+    A UID is claimed by a write to the registry that succeeds only if the UID
+    is not there, so two customers can never be given the same one. On the rare
+    occasion the number picked is taken, another is picked.
+    """
+    settings = config()["uid"]
+    lowest = 10 ** (settings["digits"] - 1)
+    entry = {"customer": number, "status": settings["issued"], "issuedOn": today().isoformat()}
+    for _ in range(settings["attempts"]):
+        uid = str(lowest + secrets.randbelow(9 * lowest))
+        keys = config()["registryKeys"]
+        if put_once(registry(), keys["uid_prefix"] + uid, keys["entry"], entry):
+            return uid
+    raise refuse(409, "no_capacity")
+
+
+def uid_of(number: str, table: Any) -> str:
+    """The customer's UID, issued now if they have none. It never changes once issued."""
+    held = one(table, names()["firm_partition"], names()["uid"])
+    if held is None:
+        issued = {"uid": issue_uid(number), "issuedOn": today().isoformat()}
+        # Written once: if two requests issue one each, the first to be written
+        # is the customer's UID and the other is left unused in the registry.
+        held = (
+            issued
+            if put_once(table, names()["firm_partition"], names()["uid"], issued)
+            else one(table, names()["firm_partition"], names()["uid"])
+        )
+    write_label(number, uid=held["uid"])
+    found: str = held["uid"]
+    return found
+
+
 def number_on_record(person: dict[str, str]) -> str | None:
     """The customer number the sign-in service holds, which a token issued earlier may not show."""
     try:
@@ -689,6 +733,7 @@ NOBODY: dict[str, Any] = {
     "agreement": None,
     "people": [],
     "changes": [],
+    "uid": None,
 }
 
 
@@ -711,6 +756,7 @@ def account_view(person: dict[str, str]) -> dict[str, Any]:
         "people": people_in(shared),
         "changes": changes_in(shared),
         "versions": versions(),
+        "uid": shared.get(names()["uid"], {}).get("uid"),
     }
 
 
@@ -729,7 +775,10 @@ def enrol(event: Event) -> dict[str, Any]:
     """
     person = claims(event)
     if customer_of(person):
-        return {"member": {"role": member_of(person).role}, "renew": False}
+        # Already a member. A customer from before UIDs were issued is given one.
+        membership = member_of(person)
+        uid_of(membership.number, membership.table)
+        return {"member": {"role": membership.role}, "renew": False}
 
     held = number_on_record(person)
     if held:
@@ -738,11 +787,13 @@ def enrol(event: Event) -> dict[str, Any]:
         member = one(store(held), names()["firm_partition"], names()["member_prefix"] + person["sub"])
         if member is None:
             raise refuse(400, "no_firm")
+        uid_of(held, store(held))
         return {"member": {"role": member["role"]}, "renew": True}
 
     number, table = claim_a_number(person)
     statuses = config()["customerStatuses"]
     write_label(number, status=statuses["signed_up"], signed_up_on=today().isoformat())
+    uid_of(number, table)
     role = config()["firstMemberRole"]
     add_member(table, person["sub"], person.get("email", ""), role, person.get("email", ""))
     attach(person["sub"], number)

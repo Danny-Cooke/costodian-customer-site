@@ -80,7 +80,7 @@ module "account" {
   unprotected_customer_numbers       = var.unprotected_customer_numbers
   customer_data_table_actions        = var.customer_data_table_actions
   customer_data_key_actions          = var.customer_data_key_actions
-  legacy_key_actions                 = var.legacy_key_actions
+  registry_key_actions               = var.registry_key_actions
 
   # The product's version catalogue: one parameter, and the rule that appends to
   # it when a version tag is created. Its name is composed in shared_locals.tf,

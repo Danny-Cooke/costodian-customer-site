@@ -24,6 +24,7 @@ Deployed by the GitHub workflows into the Account Factory management account, Lo
 | My account | Your details, Company information (funding types, billing set-up, version), People, Agreements. |
 | People | Owners and administrators; invitations by email; role changes; removal; the change record. |
 | Customer record | A DynamoDB table and KMS key per customer number, pre-created as a pool with spares; a label per customer in Parameter Store; one `account` record in the same shape for every type. |
+| UID | Six random digits per customer, unique through a registry, shown on My account. Statuses on the label include `dormant` and `left`. |
 | Versions | A list in Parameter Store, starting at v1.0, added to when a tag is made in the repository holding each customer account's set-up. |
 | Delivery | Seed by script once; Bootstrap, Site and Destroy as GitHub workflows with OIDC; one role per service. Destroyed and rebuilt from nothing by the workflows on 22 November 2026. |
 
@@ -53,28 +54,51 @@ account; whether the request module can be used once per file.
 Before any real customer: the organisation's account quota (ten by default), the
 organisational unit customer accounts go in, and a tested root email scheme.
 
-### 2. Two portals
+### 2. The portal's sign-in, separate from the customer site's
+
+Agreed in outline with Dan on 25 November 2026; not built.
+
+- The customer site keeps one central user pool: billing, subscription, the firm's
+  record, version, and who the overall administrators are.
+- Each customer's portal has a user pool of its own, in that customer's AWS account,
+  created when they click Build.
+- The person who signed up is invited as the first user of that pool, as overall
+  administrator. The same email address is in two pools, with a password for each.
+- The portal's sign-in page is shared: customer number (the UID), email and password.
+  A public lookup turns the UID into that customer's sign-in settings and API address;
+  the page then talks only to that customer's own pool and API. One error message for
+  a wrong number, email or password.
+- A change to the overall administrators on the customer site is carried to the
+  customer's pool by the same workflow that keeps the Account Factory in step.
+- One email address belongs to one customer for now.
+- Portal roles (fee earner, reviewer, roles on a case) are given inside the portal and
+  are still to be designed.
+
+Open: whether removing an overall administrator here disables their portal sign-in
+automatically (Claude recommends yes).
+
+### 3. Two portals
 
 After sign-up everyone lands in one portal. Dan wants one for the five solicitor types
 and one for the two costs types, and will say how they differ. The `portal` value
 (`practice` or `costs`) is already recorded for each customer.
 
-### 3. An agreement for costs practitioners
+### 4. An agreement for costs practitioners
 
 A Costs Lawyer or draftsman holds an instructing firm's client's file. The present
 agreement is written for a firm holding its own clients' files and does not fit them.
 
-### 4. A way for a customer to leave
+### 5. A way for a customer to leave, or to go dormant
 
-The label has the status `left` and the dates; nothing sets them. Leaving locks the
-account and starts the retention clock: records may go seven years after the last case
+The label has the statuses `dormant` and `left` and the dates; nothing sets them. A
+dormant customer has paused: their number, UID and records are kept and no retention
+clock runs. Leaving locks the account, retires the customer number and the UID, and
+starts the retention clock: records may go seven years after the last case
 was finished, or after leaving if no case was finished. Removal is always a reviewed
 change naming the customer number.
 
-### 5. Tidying
+### 6. Tidying
 
-- Remove the old shared table, which is empty and no longer read, and the permissions
-  that point at it.
 - Topping the pool up without anyone running the Site workflow. An hourly schedule was
   refused by Claude Code's permission check on 23 November 2026 and is Dan's to add or
   to replace with a narrower job.

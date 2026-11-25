@@ -200,8 +200,29 @@ Inside a customer's table: `FIRM` holds `firm`, `company`, the agreement accepta
 `member#<person>` per member, one `change#<time>` per change and the `claim`;
 `PERSON#<person>` holds that person's own details.
 
-The earlier single table still exists, empty, and is no longer read. It is to be
-removed.
+### The UID
+
+Every customer also has a **UID**: six random digits, never duplicated, never changed
+and never issued again. It is what the customer is known by outside the sign-up system:
+what they will type, with their email address and password, to sign in to their portal,
+and what their account is built under. The sequential customer number stays internal.
+
+| | Customer number | UID |
+|---|---|---|
+| Example | `0001` | `483920` |
+| Assigned | in sequence, from the pre-made pool | at random, when the customer is created |
+| Seen by | us | the customer, on My account |
+
+A UID is claimed by a write to the **registry** that succeeds only if that UID is not
+there, so two customers can never share one; if chance picks one that is taken, another
+is picked. The registry keeps every entry for ever, marked `issued` or `retired`. The
+UID is kept with the customer's table, on their label and in the registry, and is called
+`uid` in code.
+
+A customer's label carries one of these statuses: `free`, `signed up`,
+`set-up complete`, `dormant` (they have paused; everything is kept and nothing is due
+for deletion) or `left`. A customer who is dormant or has left stays so whatever is
+saved afterwards. Not built: anything that moves a customer into or out of those two.
 
 Not built: a way for a customer to leave (the status and dates exist; nothing sets
 them yet), and the product writing the last-case date.

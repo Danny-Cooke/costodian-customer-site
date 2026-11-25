@@ -71,8 +71,9 @@ function liveAccount(data, options) {
   // needs one creates it, with them as its owner.
   // Which firm a person belongs to is carried in their token, so a token from
   // before they had one is renewed.
+  // A customer from before customer numbers were issued is given one the same way.
   async function enrolled() {
-    if (state.member) return;
+    if (state.member && state.uid) return;
     const { status, answer } = await request("POST", data.api.firm);
     if (status === 200 && answer.renew) await auth.token({ fresh: true });
     await read();

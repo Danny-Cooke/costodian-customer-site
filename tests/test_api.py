@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -177,6 +178,7 @@ ENVIRONMENT = {
     "DATA_ROLE_ARN": "arn:aws:iam::111122223333:role/test-data-role",
     "DATA_ACTIONS": "dynamodb:Query,dynamodb:GetItem",
     "VERSIONS_PARAMETER": VERSIONS,
+    "REGISTRY_TABLE_NAME": "registry",
     "VERSION_TAG_PATTERN": r"^v[0-9]+\.[0-9]+(\.[0-9]+)?$",
 }
 
@@ -194,6 +196,7 @@ def api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     handler.tables = {}
     handler.people_service = FakeDirectory()
     handler.labels = FakeParameters()
+    handler.uids = FakeTable()
     handler.people_service.register(OWNER, OWNER_EMAIL)
     handler.people_service.register(STRANGER, "other@example.test")
 
@@ -205,6 +208,7 @@ def api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(handler, "store", store)
     monkeypatch.setattr(handler, "directory", lambda: handler.people_service)
     monkeypatch.setattr(handler, "parameters", lambda: handler.labels)
+    monkeypatch.setattr(handler, "registry", lambda: handler.uids)
     CURRENT["directory"] = handler.people_service
     return handler
 
@@ -327,8 +331,8 @@ def test_each_firm_gets_a_table_of_its_own(api: Any) -> None:
     api.enrol(event(subject=STRANGER, email="other@example.test"))
     assert (api.people_service.number_of(OWNER), api.people_service.number_of(STRANGER)) == ("0001", "0002")
     assert sorted(api.tables) == ["0001", "0002"]
-    assert api.tables["0001"].sorts("FIRM")[-1] == "member#" + OWNER
-    assert api.tables["0002"].sorts("FIRM")[-1] == "member#" + STRANGER
+    assert "member#" + OWNER in api.tables["0001"].sorts("FIRM")
+    assert "member#" + STRANGER in api.tables["0002"].sorts("FIRM")
 
 
 def test_a_number_someone_else_took_a_moment_ago_is_passed_over(api: Any) -> None:
@@ -961,3 +965,109 @@ def test_a_name_is_cut_down_to_what_is_safe_in_a_resource_name(api: Any, name: s
     assert api.slug_of(name) == slug
     limit = api.config()["account"]["slug_max_length"]
     assert slug is None or (len(slug) <= limit and not slug.startswith("-") and not slug.endswith("-"))
+
+
+# ------------------------------------------------------------------- the UID
+
+
+def uid_entries(api: Any) -> dict[str, dict[str, Any]]:
+    """The registry, as {uid: its entry}."""
+    return {pk.removeprefix("UID#"): item["data"] for (pk, _sk), item in api.uids.items.items()}
+
+
+def picks(monkeypatch: pytest.MonkeyPatch, api: Any, *numbers: int) -> None:
+    """Makes the next random UIDs these, in order."""
+    queue = list(numbers)
+    monkeypatch.setattr(api.secrets, "randbelow", lambda _span: queue.pop(0) - 100000)
+
+
+def test_a_new_customer_is_given_a_six_digit_uid_kept_in_three_places(api: Any) -> None:
+    api.enrol(event())
+    uid = view(api)["uid"]
+    assert re.fullmatch(r"[1-9][0-9]{5}", uid), "six digits, never starting with a nought"
+    assert api.tables["0001"].data("FIRM", "uid")["uid"] == uid
+    assert api.labels.label("0001")["uid"] == uid
+    assert uid_entries(api)[uid]["customer"] == "0001"
+    assert uid_entries(api)[uid]["status"] == "issued"
+
+
+def test_a_uid_never_changes(firm: Any) -> None:
+    uid = view(firm)["uid"]
+    firm.enrol(event())
+    firm.write(event({"values": {**YOU, **FIRM, "account_name": "Renamed"}}, section="signup"))
+    firm.write(event({"values": company_values(firm)}, section="company"))
+    assert view(firm)["uid"] == uid
+    assert firm.labels.label("0001")["uid"] == uid
+    assert list(uid_entries(firm)) == [uid], "and no second one is issued"
+
+
+def test_two_customers_are_never_given_the_same_uid(api: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Chance picks the same number for the second customer; it is refused and another is picked.
+    picks(monkeypatch, api, 483920, 483920, 207518)
+    api.enrol(event())
+    api.enrol(event(subject=STRANGER, email="other@example.test"))
+    assert view(api)["uid"] == "483920"
+    assert view(api, STRANGER, "other@example.test")["uid"] == "207518"
+    assert {uid: entry["customer"] for uid, entry in uid_entries(api).items()} == {"483920": "0001", "207518": "0002"}
+
+
+def test_a_uid_that_was_ever_issued_is_not_issued_again_even_once_retired(
+    api: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    retired = {"customer": "0099", "status": api.config()["uid"]["retired"], "issuedOn": "2026-01-01"}
+    api.uids.put_item({"pk": "UID#483920", "sk": "entry", "data": retired})
+    picks(monkeypatch, api, 483920, 615243)
+    api.enrol(event())
+    assert view(api)["uid"] == "615243"
+    assert uid_entries(api)["483920"] == retired, "the retired entry is left exactly as it was"
+
+
+def test_if_no_free_uid_can_be_found_the_sign_up_is_asked_to_wait(api: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    api.uids.put_item({"pk": "UID#483920", "sk": "entry", "data": {"customer": "0099", "status": "issued"}})
+    monkeypatch.setattr(api.secrets, "randbelow", lambda _span: 383920)
+    status, body = answer(api.enrol(event()))
+    assert (status, body["error"]) == (409, "no_capacity")
+
+
+def test_a_customer_from_before_uids_is_given_one_when_they_next_sign_in(firm: Any) -> None:
+    # As a customer was before UIDs existed: a member, with no UID anywhere.
+    del firm.tables["0001"].items[("FIRM", "uid")]
+    firm.uids.items.clear()
+    label = {name: value for name, value in firm.labels.label("0001").items() if name != "uid"}
+    firm.labels.values[f"{PATH}/0001"] = json.dumps(label)
+    assert view(firm)["uid"] is None
+
+    assert answer(firm.enrol(event())) == (200, {"member": {"role": "owner"}, "renew": False})
+    uid = view(firm)["uid"]
+    assert uid and firm.labels.label("0001")["uid"] == uid and uid_entries(firm)[uid]["customer"] == "0001"
+
+
+def test_everyone_in_a_firm_sees_the_same_uid(firm: Any) -> None:
+    invite(firm)
+    alex = member(firm, "alex@example.test")["sub"]
+    assert view(firm, alex, "alex@example.test")["uid"] == view(firm)["uid"]
+
+
+def test_a_person_with_no_firm_has_no_uid(api: Any) -> None:
+    assert view(api)["uid"] is None
+    assert uid_entries(api) == {}
+
+
+# ------------------------------------------------------------------- dormant
+
+
+@pytest.mark.parametrize("held", ["dormant", "left"])
+def test_a_customer_who_is_dormant_or_has_left_stays_so_whatever_is_saved(firm: Any, held: str) -> None:
+    uid = view(firm)["uid"]
+    firm.write_label("0001", status=held)
+    firm.write(event({"values": {**YOU, **FIRM, "account_name": "Renamed"}}, section="signup"))
+    firm.write(event({"values": company_values(firm)}, section="company"))
+    label = firm.labels.label("0001")
+    assert (label["status"], label["name"], label["uid"]) == (held, "Renamed", uid)
+
+
+def test_a_dormant_customer_keeps_everything_and_their_retention_clock_does_not_start(firm: Any) -> None:
+    firm.write_label("0001", status="dormant")
+    assert firm.labels.label("0001")["delete_after"] is None, "records are only ever due to go once a customer has left"
+    assert firm.tables["0001"].data("FIRM", "firm")["values"]["account_name"] == FIRM["account_name"]
+    assert firm.labels.label("0002")["status"] == FREE, "their number is not handed to anyone else"

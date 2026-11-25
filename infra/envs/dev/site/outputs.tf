@@ -49,7 +49,7 @@ output "api_base_path" {
 }
 
 output "account_table_name" {
-  description = "The one table every firm shared before each customer had its own."
+  description = "The registry of customer UIDs. It holds no customer data."
   value       = module.account.table_name
 }
 

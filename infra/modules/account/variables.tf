@@ -213,8 +213,8 @@ variable "data_role_assume_actions" {
   default     = ["sts:AssumeRole"]
 }
 
-variable "legacy_key_actions" {
-  description = "What a function with legacy_table_actions may do with the key the old shared table is encrypted with. Granted only to those functions, and only while that table exists."
+variable "registry_key_actions" {
+  description = "What a function with registry_actions may do with the key the UID registry table is encrypted with. Granted only to those functions."
   type        = list(string)
 }
 
@@ -441,9 +441,8 @@ variable "functions" {
 
     parameter_actions are taken on the customer label parameters and nothing
     else; versions_actions on the one version catalogue parameter and nothing
-    else; pool_actions on this user pool and nothing else; legacy_table_actions
-    on the one table every firm shared before each had its own, which stays
-    only until the firms signed up before then have been moved out of it. An
+    else; pool_actions on this user pool and nothing else; registry_actions
+    on the registry of customer UIDs and nothing else. An
     empty list writes no statement at all, so a function that does not need a
     service never mentions it, and a function with no data_actions is not even
     allowed to take customer data credentials.
@@ -452,13 +451,13 @@ variable "functions" {
     way, and gets no integration, no route and no permission for the API.
   EOT
   type = map(object({
-    handler              = string
-    routes               = list(string)
-    data_actions         = list(string)
-    parameter_actions    = list(string)
-    pool_actions         = list(string)
-    legacy_table_actions = list(string)
-    versions_actions     = optional(list(string), [])
+    handler           = string
+    routes            = list(string)
+    data_actions      = list(string)
+    parameter_actions = list(string)
+    pool_actions      = list(string)
+    registry_actions  = list(string)
+    versions_actions  = optional(list(string), [])
   }))
 
   validation {
