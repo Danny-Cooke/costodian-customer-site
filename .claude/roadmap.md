@@ -78,8 +78,6 @@ change naming the customer number.
 - Topping the pool up without anyone running the Site workflow. An hourly schedule was
   refused by Claude Code's permission check on 23 November 2026 and is Dan's to add or
   to replace with a narrower job.
-- Rename the repository (it still carries the product's earlier name), which also means
-  re-running the seed and Bootstrap because the roles trust the repository by name.
 - Check registration numbers (SRA, CL, Companies House) against their registers.
 
 ## Later
@@ -102,7 +100,6 @@ change naming the customer number.
 - Whether a build needs his approval for now, or goes straight through.
 - Whether a firm may accept the agreement while it is a draft (it currently can; the
   version is recorded).
-- Whether the repository is renamed.
 - The price, the refund period and the contact address.
 
 ## Stated on the site, not yet built
