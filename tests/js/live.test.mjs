@@ -452,15 +452,17 @@ test("the versions on offer come from the API, and a firm's own choice is shown"
   assert.equal("registerVersion" in net.requests.at(-1).body, false);
 });
 
-test("my account shows the customer number the firm signs in to its portal with", async () => {
+test("my account shows the UID the firm signs in to its portal with, and never the internal number", async () => {
   const net = network({ [`GET ${data.api.account}`]: () => accountOf(OWNER) });
   const page = await openLive("portal", sessionWith(memoryStorage()), net);
   assert.equal(page.one("[data-uid-panel]").hidden, false);
   assert.equal(page.one("[data-uid]").textContent, "483920");
-  assert.equal(net.requests.length, 1, "a customer who has a number is not asked for one again");
+  assert.match(page.one("[data-uid-panel] h2").textContent, /UID/);
+  assert.doesNotMatch(page.document.body.textContent, /customer number/i, "the page never speaks of a customer number");
+  assert.equal(net.requests.length, 1, "a customer who has a UID is not asked for one again");
 });
 
-test("a customer from before customer numbers is given one when they sign in", async () => {
+test("a customer from before UIDs is given one when they sign in", async () => {
   let issued = false;
   const net = network({
     [`GET ${data.api.account}`]: () => accountOf(OWNER, { uid: issued ? "207518" : null }),

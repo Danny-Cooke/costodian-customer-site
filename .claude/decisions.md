@@ -115,7 +115,8 @@ Agreed in outline; not built. Detail in `context/account-factory-hand-off.md`.
   key. It reuses the emptied shared table. The UID is six digits from 100000, so it never
   starts with a nought. Issued UIDs stay in the registry for ever. The UID names
   everything made at Build; the sequential number stays inside the sign-up system. The
-  UID is shown to customers as "customer number". It is an address, not a secret: the
+  UID is shown to customers as "UID"; the words "customer number" are never shown, and
+  neither is the sequential number. It is an address, not a secret: the
   lookup will be rate-limited and give one error for every kind of wrong sign-in.
 - **Claude.** A dormant customer keeps everything and their retention clock does not
   run. Dormant and left are held: nothing the customer saves changes them.
