@@ -153,6 +153,11 @@ That is item 10. Nothing in the design stands in the way.
 registry belong to the account they are in. A new account starts empty. Moving existing
 customers would mean everyone resetting their password.
 
+**To create in the production organisation before any customer account is vended
+(Dan, 25 November 2026):** an organisational unit named `Workloads`, registered with
+Control Tower. Every customer account is vended into it. The name is a value in the
+account request settings, not typed in the template.
+
 **To check in the production organisation before deploying:** that its service control
 policies allow CloudFront and the WAF in `us-east-1`; that the Account Factory's
 repositories are where `version_source_repository` expects them; the account quota.

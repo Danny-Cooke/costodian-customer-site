@@ -124,3 +124,40 @@ at that tag. **To confirm in the documentation.**
 
 The shared product front end and this hand-off belong in a platform account of their
 own, not in the Account Factory management account, where the portal sits for now.
+
+## The first vend, 25 November 2026 (what a real run showed)
+
+Customer 0001 was vended by hand from the `aft-account-request` repository (a clone sits
+beside this one): the factory's own module, a fixed `main.tf` with one request per file
+in `terraform/customers/`, `settings.auto.tfvars.json`, and `customers/587076.json`.
+
+| Time (UTC) | What |
+|---|---|
+| 21:40 | push to `main`; `ct-aft-account-request` pipeline started |
+| 21:43 | pipeline succeeded: the factory's Terraform (1.6.1) accepted `for_each` over the module |
+| 21:44 | request processor asked Control Tower for the account |
+| 21:53 | account `296897077381` existed; provisioning framework started |
+| 21:56 | framework succeeded; `296897077381-customizations-pipeline` started |
+| 21:59 | global and account customisations succeeded |
+
+Settled by it:
+
+- One module block with `for_each` works in the factory's pipeline.
+- AWS accepted the `+` in the root email and hyphens in the account name
+  (`customer-0001-587076`).
+- With no `account_customizations_name`, the account-customisation stage runs and
+  passes with nothing to do (read in the buildspec, then seen).
+- All 33 custom fields arrived in the account under
+  `/aft/account-request/custom-fields/`, every one of type `String` (not encrypted;
+  also read in `aft_common/ssm.py`). An empty value is refused, so empty fields are
+  left out of the customer file.
+- About 19 minutes from push to finished, with nothing in the customisations.
+
+Not settled: what the factory's notifications contain (nothing was subscribed); whether
+the account has root credentials (`get-account-summary` showed no password and no keys,
+which is not proof); whether the break-glass invitation arrived in the mailbox.
+
+Dan, the same day: no per-portal customisation folders. One module in the global
+customisations handles every customer and reads `portal` from the custom fields. It
+must do nothing in an account with no `uid` field. Globals are to be thought about
+later.
