@@ -130,3 +130,45 @@ Agreed in outline; not built. Detail in `context/account-factory-hand-off.md`.
   account, with a different GitHub sign-in. Assessed the same day: yes as a second `dev`;
   production needs the environment made a parameter (road map, "Portability").
 - **Dan.** People see the UID, never a customer number.
+
+## 25 November 2026: the Account Factory request
+
+All Dan's unless marked.
+
+- **Everything the customer site holds about a customer is passed in the request's
+  custom fields.** A rule. A change on the customer site (a phone number, say) must flow
+  through to the customer's account. Passwords and the change history are not customer
+  information and are not passed.
+- **Account name:** `customer-<customer number>-<uid>`, for example
+  `customer-0001-587076`. The word comes from the same `customer` component value the
+  table name uses. Hyphens are Claude's choice; the characters Control Tower accepts in
+  an account name were not confirmed from the documentation.
+- **Organisational unit:** `Workloads`. It has to be created and registered with Control
+  Tower in the next organisation first (road map, "Portability").
+- **Root email:** plus addressing on a mailbox we own, `aws+<account name>@<domain>`.
+  The pattern is a value. Owed: a test that AWS accepts the `+` (the CreateAccount rules
+  read on 25 November do not forbid it and do not say it is allowed) and that the mail
+  host delivers it.
+- **Centralised root access is to be enabled** in the organisation, so customer accounts
+  have no root credentials. It is an organisation setting and belongs with the landing
+  zone, not this repository. Not verified: that accounts vended through the Account
+  Factory are created without root credentials as ones created directly are.
+- **We run this as a service:** customers get no access to the AWS account. The
+  break-glass SSO user is on an address we control.
+- **Break-glass SSO user: one per customer account,** `aws+<account name>-bg@<domain>`,
+  for example `aws+customer-0001-587076-bg@cm-it.co.uk`. The `-bg` suffix is a value.
+  It cannot be changed on an account once vended.
+- **The event side lives in this repository:** the rule, the workflow and the function
+  that records the outcome.
+- **Claude, agreed in discussion:** one file per customer in the request repository,
+  named by UID; a fixed `main.tf` with one request per file; every save bumps a revision
+  on the label, and the workflow reads the full record from the customer's table; a
+  separate `builds/<number>` parameter written only by the workflow; tags carry no firm
+  name and nothing about a person.
+
+Sources read 25 November 2026: the Account Factory pages of the Control Tower user
+guide (provision, update, customisation options, components, multiple requests) and
+the `aft-account-request` module's `variables.tf` and `ddb.tf`; the SES endpoints table;
+the IAM user guide on centralised root access; the Organizations `CreateAccount`
+reference. Deployed here: Account Factory 1.23.0 on CodeCommit, request repository
+empty.
