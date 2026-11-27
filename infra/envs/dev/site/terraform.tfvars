@@ -346,7 +346,7 @@ functions = {
 # Built before plan, from this stack's directory. See runbooks/deploy.md.
 package_dir = "../../../../build/api"
 
-lambda_runtime   = "python3.12"
+lambda_runtime = "python3.12"
 # Memory is also processor: at 256 the first request after a quiet spell spent
 # several seconds making its AWS clients, which is what a person saw as a page
 # that took ten seconds to say what was done.
