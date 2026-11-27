@@ -55,6 +55,14 @@ variable "services" {
   type        = list(string)
 }
 
+variable "site_domain" {
+  description = "The domain the site is served at and sends email from, and the id of its Route 53 hosted zone in this account. The zone was made when the domain was registered, which is the one thing here not made by Terraform, so its id is declared rather than created. Declared with the shared values because both stacks need it: the site stack creates the records, the certificate and the sending identity, the bootstrap stack scopes the roles that may."
+  type = object({
+    name    = string
+    zone_id = string
+  })
+}
+
 variable "repository_suffix" {
   description = "What this repository builds, as it appears in the repository's name after the product's name: a product named \"Example Co\" with the suffix \"customer-site\" lives in the repository \"example-co-customer-site\"."
   type        = string
