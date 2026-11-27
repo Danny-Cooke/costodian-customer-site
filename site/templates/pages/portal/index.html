@@ -16,7 +16,8 @@
           <h2><a href="{{ routes[step.route] }}">{{ step.title }}</a></h2>
           <p>{{ step.summary }}</p>
         </div>
-        <span class="badge" data-badge data-label-done="{{ site.labels.done }}" data-label-todo="{{ site.labels.to_do }}">{{ site.labels.to_do }}</span>
+        {# Nothing is claimed about a step until the account has been read. #}
+        <span class="badge pending" data-badge data-label-done="{{ site.labels.done }}" data-label-todo="{{ site.labels.to_do }}" data-label-unknown="{{ site.labels.not_known }}">{{ site.labels.checking }}</span>
       </li>
       {% endfor %}
     </ol>
@@ -29,7 +30,8 @@
 
     <div class="panel" data-account>
       <h2>Your {{ site.product.name }} account</h2>
-      <p data-when="waiting">Waiting for set-up. Finish the steps above and your account will be created.</p>
+      <p data-when="checking">{{ site.labels.checking }}</p>
+      <p data-when="waiting" hidden>Waiting for set-up. Finish the steps above and your account will be created.</p>
       <div data-when="ready" hidden>
         <p><strong>Set-up is complete.</strong> When sign-up opens, this is where your firm's account is created and you receive your invitation to {{ site.product.name }}.</p>
       </div>

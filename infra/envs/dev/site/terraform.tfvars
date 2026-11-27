@@ -347,7 +347,10 @@ functions = {
 package_dir = "../../../../build/api"
 
 lambda_runtime   = "python3.12"
-lambda_memory_mb = 256
+# Memory is also processor: at 256 the first request after a quiet spell spent
+# several seconds making its AWS clients, which is what a person saw as a page
+# that took ten seconds to say what was done.
+lambda_memory_mb = 1024
 
 # A request is now a session from STS, then several calls to the customer's
 # table, and for enrol a walk of the pool's labels and a UID claimed in the

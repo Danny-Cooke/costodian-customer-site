@@ -203,6 +203,18 @@ test("my account shows who is signed in and what is done, read from the API", as
   assert.equal(page.one('[data-setup-step="agreement"] [data-badge]').textContent, "To do");
 });
 
+test("my account claims nothing about a step when the account cannot be read", async () => {
+  const net = network({ [`GET ${data.api.account}`]: () => ({ status: 500 }) });
+  const page = await openLive("portal", sessionWith(memoryStorage()), net);
+  for (const step of ["details", "company", "agreement"]) {
+    const badge = page.one(`[data-setup-step="${step}"] [data-badge]`);
+    assert.equal(badge.textContent, "Could not check", step);
+    assert.ok(!badge.classList.contains("done"));
+  }
+  assert.equal(page.one('[data-account] [data-when="waiting"]').hidden, true);
+  assert.equal(page.one('[data-account] [data-when="ready"]').hidden, true);
+});
+
 test("your details are filled from the account and saved back to it", async () => {
   const net = network({
     [`GET ${data.api.account}`]: () => accountOf(OWNER),
