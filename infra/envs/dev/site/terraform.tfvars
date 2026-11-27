@@ -220,9 +220,11 @@ invite_message_template = {
   message = "You have been invited to help manage your firm's {product} account.<br><br>Sign in at {site_url}/signin/ with:<br><br>Email address: {username}<br>Temporary password: {####}<br><br>You will be asked to choose your own password the first time you sign in. The temporary password stops working after {days} days."
 }
 
+# The email that carries a code says which site it is for, why it was sent and
+# where it goes. It is short on purpose.
 verification_message_template = {
-  subject = "Your {product} code"
-  message = "Your {product} confirmation code is {####}"
+  subject = "Your {product} customer site code"
+  message = "Here is your code for the {product} customer site: <b>{####}</b><br><br>It was emailed to you because you are creating your account, resetting your password or confirming your email address. Type it into the box that asks for the code."
 }
 
 # What Cognito refuses a message without. Checked at plan.
