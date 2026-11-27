@@ -1,8 +1,10 @@
 # The front door: the static site in a private bucket, CloudFront with origin
 # access control in front of it, a viewer-request function that maps page paths
 # to their index document, security headers on every response, and WAF in
-# us-east-1. The site runs on the CloudFront domain; there is no certificate or
-# DNS here.
+# us-east-1. Given a domain, it also has a certificate for it, the records that
+# prove ownership and point the name at the distribution, and a redirect to the
+# one name from every other address. Without one it runs on the CloudFront
+# domain.
 #
 # Every resource names the provider it is created with, so each one is created
 # by the role for its own service and nothing silently inherits a broader
@@ -11,12 +13,14 @@
 #   aws.storage   the bucket and everything configuring it
 #   aws.cdn       CloudFront, in the stack's own Region
 #   aws.edge      WAF, which for CloudFront scope must be in us-east-1
+#   aws.certificates  the certificate, which CloudFront also takes from us-east-1
+#   aws.dns       records in the domain's hosted zone
 
 terraform {
   required_providers {
     aws = {
       source                = "hashicorp/aws"
-      configuration_aliases = [aws.storage, aws.cdn, aws.edge]
+      configuration_aliases = [aws.storage, aws.cdn, aws.edge, aws.certificates, aws.dns]
     }
   }
 }
@@ -49,7 +53,76 @@ locals {
 
   rewrite_code = templatefile("${path.module}/functions/rewrite.js.tftpl", {
     index_document = var.index_document
+    canonical_host = local.canonical_host
   })
+
+  # With a domain, the bare name is the site's one address and every other host
+  # under it is served only to be redirected there.
+  domains         = var.domain == null ? [] : [var.domain]
+  canonical_host  = var.domain == null ? "" : var.domain.name
+  alternate_hosts = var.domain == null ? [] : [for host in var.domain.alternate_hosts : "${host}.${var.domain.name}"]
+  hosts           = var.domain == null ? [] : concat([local.canonical_host], local.alternate_hosts)
+
+  # One address record of each family per host.
+  address_records = {
+    for pair in setproduct(local.hosts, var.address_record_types) : "${pair[0]} ${pair[1]}" => {
+      host = pair[0]
+      type = pair[1]
+    }
+  }
+}
+
+# ------------------------------------------------------------- certificate
+
+resource "aws_acm_certificate" "site" {
+  for_each = { for domain in local.domains : domain.name => domain }
+  provider = aws.certificates
+
+  domain_name               = local.canonical_host
+  subject_alternative_names = local.alternate_hosts
+  validation_method         = "DNS"
+
+  tags = merge(local.tags, { Name = local.canonical_host })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# The records ACM asks for, to prove the domain is ours. Keyed by host, which
+# is known at plan; the record itself is not until the certificate exists.
+resource "aws_route53_record" "certificate" {
+  for_each = toset(local.hosts)
+  provider = aws.dns
+
+  zone_id = var.domain.zone_id
+  name    = one([for option in aws_acm_certificate.site[local.canonical_host].domain_validation_options : option.resource_record_name if option.domain_name == each.value])
+  type    = one([for option in aws_acm_certificate.site[local.canonical_host].domain_validation_options : option.resource_record_type if option.domain_name == each.value])
+  records = [one([for option in aws_acm_certificate.site[local.canonical_host].domain_validation_options : option.resource_record_value if option.domain_name == each.value])]
+  ttl     = var.domain.validation_ttl_seconds
+}
+
+resource "aws_acm_certificate_validation" "site" {
+  for_each = aws_acm_certificate.site
+  provider = aws.certificates
+
+  certificate_arn         = each.value.arn
+  validation_record_fqdns = [for record in aws_route53_record.certificate : record.fqdn]
+}
+
+resource "aws_route53_record" "site" {
+  for_each = local.address_records
+  provider = aws.dns
+
+  zone_id = var.domain.zone_id
+  name    = each.value.host
+  type    = each.value.type
+
+  alias {
+    name                   = aws_cloudfront_distribution.this.domain_name
+    zone_id                = aws_cloudfront_distribution.this.hosted_zone_id
+    evaluate_target_health = false
+  }
 }
 
 data "aws_cloudfront_cache_policy" "default" {
@@ -353,6 +426,7 @@ resource "aws_cloudfront_distribution" "this" {
   default_root_object = var.index_document
   price_class         = var.price_class
   web_acl_id          = aws_wafv2_web_acl.this.arn
+  aliases             = local.hosts
 
   origin {
     domain_name              = aws_s3_bucket.web.bucket_regional_domain_name
@@ -437,8 +511,12 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  # Its own certificate when it has a domain, CloudFront's when it does not.
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = var.domain == null
+    acm_certificate_arn            = var.domain == null ? null : aws_acm_certificate_validation.site[local.canonical_host].certificate_arn
+    ssl_support_method             = var.domain == null ? null : var.domain.ssl_support_method
+    minimum_protocol_version       = var.domain == null ? null : var.domain.minimum_protocol_version
   }
 
   tags = merge(local.tags, { Name = module.naming.names["cdn"] })

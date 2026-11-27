@@ -33,6 +33,16 @@ variable "not_found_response_code" {
   default     = 404
 }
 
+variable "site_alternate_hosts" {
+  description = "Hosts under the site's domain that are served only to be redirected to the bare name."
+  type        = list(string)
+}
+
+variable "site_minimum_protocol_version" {
+  description = "The oldest TLS policy the site's own name accepts."
+  type        = string
+}
+
 variable "cloudfront_price_class" {
   description = "CloudFront price class."
   type        = string
