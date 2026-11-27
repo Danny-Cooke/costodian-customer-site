@@ -252,12 +252,143 @@ service_roles = {
         read_actions  = []
         write_actions = ["wafv2:CreateWebACL", "wafv2:UpdateWebACL"]
       }
+      # CloudFront checks that whoever puts a certificate on a distribution can
+      # see it. The certificate is made by the certificates role.
+      distribution_certificate = {
+        resources     = ["certificates"]
+        read_actions  = ["acm:DescribeCertificate", "acm:GetCertificate"]
+        write_actions = []
+      }
+      # Whether a domain name is already on another distribution. A list call.
+      alias_listing = {
+        resources     = ["unscopable"]
+        read_actions  = ["acm:ListCertificates", "cloudfront:ListConflictingAliases"]
+        write_actions = []
+      }
       waf_listing = {
         resources = ["unscopable"]
         read_actions = [
           "wafv2:DescribeManagedRuleGroup",
           "wafv2:ListAvailableManagedRuleGroups",
           "wafv2:ListWebACLs",
+        ]
+        write_actions = []
+      }
+    }
+  }
+
+  # ------------------------------------------------------------- certificates
+  certificates = {
+    description = "Requests and removes the site's certificate in the edge Region."
+    statements = {
+      certificates = {
+        resources = ["certificates"]
+        read_actions = [
+          "acm:DescribeCertificate",
+          "acm:GetCertificate",
+          "acm:ListTagsForCertificate",
+        ]
+        write_actions = [
+          "acm:AddTagsToCertificate",
+          "acm:DeleteCertificate",
+          "acm:RemoveTagsFromCertificate",
+          "acm:RenewCertificate",
+          "acm:UpdateCertificateOptions",
+        ]
+      }
+      # RequestCertificate takes no resource: the certificate's id does not
+      # exist yet, and the tags it is requested with are checked the same way.
+      new_certificates = {
+        resources     = ["unscopable"]
+        read_actions  = ["acm:ListCertificates"]
+        write_actions = ["acm:AddTagsToCertificate", "acm:RequestCertificate"]
+      }
+    }
+  }
+
+  # ---------------------------------------------------------------------- dns
+  dns = {
+    description = "Writes records in the site's own hosted zone: the site's addresses, the certificate's proof of ownership and the sending identity's."
+    statements = {
+      zone = {
+        resources = ["dns_zone"]
+        read_actions = [
+          "route53:GetHostedZone",
+          "route53:ListResourceRecordSets",
+          "route53:ListTagsForResource",
+        ]
+        write_actions = ["route53:ChangeResourceRecordSets"]
+      }
+      changes = {
+        resources     = ["dns_changes"]
+        read_actions  = ["route53:GetChange"]
+        write_actions = []
+      }
+      zone_listing = {
+        resources = ["unscopable"]
+        read_actions = [
+          "route53:ListHostedZones",
+          "route53:ListHostedZonesByName",
+        ]
+        write_actions = []
+      }
+    }
+  }
+
+  # -------------------------------------------------------------------- email
+  email = {
+    description = "Creates the domain's sending identity in SES, its signing and return-path settings, and its configuration set. It cannot send an email."
+    statements = {
+      identity = {
+        resources = ["email_identity"]
+        read_actions = [
+          "ses:GetEmailIdentity",
+          "ses:GetEmailIdentityPolicies",
+          "ses:ListTagsForResource",
+        ]
+        write_actions = [
+          "ses:CreateEmailIdentity",
+          "ses:CreateEmailIdentityPolicy",
+          "ses:DeleteEmailIdentity",
+          "ses:DeleteEmailIdentityPolicy",
+          "ses:PutEmailIdentityConfigurationSetAttributes",
+          "ses:PutEmailIdentityDkimAttributes",
+          "ses:PutEmailIdentityDkimSigningAttributes",
+          "ses:PutEmailIdentityFeedbackAttributes",
+          "ses:PutEmailIdentityMailFromAttributes",
+          "ses:TagResource",
+          "ses:UntagResource",
+          "ses:UpdateEmailIdentityPolicy",
+        ]
+      }
+      configuration_sets = {
+        resources = ["email_configuration_sets"]
+        read_actions = [
+          "ses:GetConfigurationSet",
+          "ses:GetConfigurationSetEventDestinations",
+          "ses:ListTagsForResource",
+        ]
+        write_actions = [
+          "ses:CreateConfigurationSet",
+          "ses:CreateConfigurationSetEventDestination",
+          "ses:DeleteConfigurationSet",
+          "ses:DeleteConfigurationSetEventDestination",
+          "ses:PutConfigurationSetDeliveryOptions",
+          "ses:PutConfigurationSetReputationOptions",
+          "ses:PutConfigurationSetSendingOptions",
+          "ses:PutConfigurationSetSuppressionOptions",
+          "ses:TagResource",
+          "ses:UntagResource",
+          "ses:UpdateConfigurationSetEventDestination",
+        ]
+      }
+      # The account's sending status and the list calls take no resource.
+      email_listing = {
+        resources = ["unscopable"]
+        read_actions = [
+          "ses:GetAccount",
+          "ses:ListConfigurationSets",
+          "ses:ListEmailIdentities",
         ]
         write_actions = []
       }
@@ -296,6 +427,30 @@ service_roles = {
         resources     = ["unscopable"]
         read_actions  = ["cognito-idp:ListUserPools"]
         write_actions = ["cognito-idp:CreateUserPool", "cognito-idp:TagResource"]
+      }
+      # Telling the pool to send through SES: Cognito checks the identity it is
+      # given, with the caller's permissions.
+      pool_sending_identity = {
+        resources = ["email_identity"]
+        read_actions = [
+          "ses:GetEmailIdentity",
+          "ses:GetIdentityVerificationAttributes",
+        ]
+        write_actions = []
+      }
+      # The first time, Cognito also makes its own role for sending, with the
+      # caller's permissions. That one role, for that one service.
+      pool_sending_role = {
+        resources     = ["cognito_email_service_role"]
+        read_actions  = []
+        write_actions = ["iam:CreateServiceLinkedRole"]
+        conditions = [
+          {
+            test     = "StringEquals"
+            variable = "iam:AWSServiceName"
+            values   = ["email.cognito-idp.amazonaws.com"]
+          },
+        ]
       }
     }
   }

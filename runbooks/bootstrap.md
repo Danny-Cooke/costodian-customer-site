@@ -92,8 +92,11 @@ None of them can do everything:
 | `deploy` | OIDC from `dev` | read and write of the site state object and its lock, and `sts:AssumeRole` on the service roles. Nothing else |
 | `storage` | chained from `deploy` | the site bucket, and its objects' deletes so a destroy can empty it |
 | `keys` | chained from `deploy` | the sign-up KMS key and alias |
-| `edge` | chained from `deploy` | CloudFront and the web ACL |
-| `identity` | chained from `deploy` | the Cognito pool and client |
+| `edge` | chained from `deploy` | CloudFront and the web ACL, and sight of the certificate |
+| `certificates` | chained from `deploy` | the site's certificate, in the edge Region |
+| `dns` | chained from `deploy` | records in the site's own hosted zone, and no other zone |
+| `email` | chained from `deploy` | the domain's sending identity in SES and its configuration set. It cannot send |
+| `identity` | chained from `deploy` | the Cognito pool and client, and telling the pool to send through the domain's identity |
 | `data` | chained from `deploy` | the account table |
 | `compute` | chained from `deploy` | the functions, the HTTP API, the log groups |
 | `access` | chained from `deploy` | the functions' IAM roles, and only with the permissions boundary |
