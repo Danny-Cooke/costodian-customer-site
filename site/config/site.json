@@ -223,6 +223,8 @@
     "no": "No",
     "done": "Done",
     "to_do": "To do",
+    "checking": "Checking…",
+    "not_known": "Could not check",
     "blank": "Not given",
     "covered": "Covered",
     "uid": "UID",

@@ -801,6 +801,13 @@ input.short {
   color: var(--warn);
 }
 
+/* Not yet known: neither done nor to do. */
+.badge.pending {
+  background: var(--line);
+  color: inherit;
+  font-weight: 400;
+}
+
 .badge.done {
   background: var(--accent-soft);
   color: var(--accent);
