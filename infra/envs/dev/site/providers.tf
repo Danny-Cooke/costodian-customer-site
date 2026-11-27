@@ -102,6 +102,44 @@ provider "aws" {
   }
 }
 
+# The certificate CloudFront serves must be in the edge Region too.
+provider "aws" {
+  alias  = "certificates"
+  region = var.platform.edge_region
+
+  dynamic "assume_role" {
+    for_each = local.assumed["certificates"]
+
+    content {
+      role_arn     = assume_role.value
+      session_name = local.assume_session_name
+    }
+  }
+
+  default_tags {
+    tags = local.default_tags
+  }
+}
+
+# Route 53 is global; its API is called in the stack's own Region.
+provider "aws" {
+  alias  = "dns"
+  region = var.platform.region
+
+  dynamic "assume_role" {
+    for_each = local.assumed["dns"]
+
+    content {
+      role_arn     = assume_role.value
+      session_name = local.assume_session_name
+    }
+  }
+
+  default_tags {
+    tags = local.default_tags
+  }
+}
+
 provider "aws" {
   alias  = "identity"
   region = var.platform.region

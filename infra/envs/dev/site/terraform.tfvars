@@ -5,6 +5,12 @@ not_found_document = "/404.html"
 
 cloudfront_price_class = "PriceClass_100"
 
+# The site's name and its hosted zone are in ../platform.tfvars.json. www is
+# served only to be sent on to the bare name, and so is the address CloudFront
+# gave the site before it had one.
+site_alternate_hosts          = ["www"]
+site_minimum_protocol_version = "TLSv1.2_2021"
+
 # The site has no inline scripts or styles and loads nothing from elsewhere, so
 # the policy allows its own origin only.
 content_security_policy = {

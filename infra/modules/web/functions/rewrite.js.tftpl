@@ -1,9 +1,36 @@
-// Viewer-request function. The site is built as one folder per page, so a
-// request for /pricing/ or /pricing is answered with /pricing/${index_document}.
-// A path whose last segment has a dot in it is a file and is left alone.
+// Viewer-request function. Two jobs.
+//
+// The site has one address, its own name. A request that arrives by any other
+// (www, or the address CloudFront gave the site before it had a name) is sent
+// on to the same page at the site's own name. With no name set, nothing is
+// redirected.
+//
+// The site is built as one folder per page, so a request for /pricing/ or
+// /pricing is answered with /pricing/${index_document}. A path whose last
+// segment has a dot in it is a file and is left alone.
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
+  var canonical = '${canonical_host}';
+  var host = request.headers && request.headers.host ? request.headers.host.value : '';
+  if (canonical && host !== canonical) {
+    var query = [];
+    for (var name in request.querystring) {
+      var entry = request.querystring[name];
+      var values = entry.multiValue ? entry.multiValue : [entry];
+      for (var i = 0; i < values.length; i++) {
+        query.push(values[i].value === '' ? name : name + '=' + values[i].value);
+      }
+    }
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: {
+        location: { value: 'https://' + canonical + uri + (query.length ? '?' + query.join('&') : '') },
+        'cache-control': { value: 'no-store' },
+      },
+    };
+  }
   if (uri.endsWith('/')) {
     request.uri = uri + '${index_document}';
   } else if (uri.lastIndexOf('.') < uri.lastIndexOf('/')) {

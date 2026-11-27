@@ -71,6 +71,25 @@ variable "cached_methods" {
   type        = list(string)
 }
 
+variable "domain" {
+  description = "The site's own domain: the name it is served at, the id of the Route 53 hosted zone that holds it, the hosts under it that redirect to it, and how the certificate is served. Null leaves the site on the CloudFront domain with CloudFront's certificate."
+  type = object({
+    name                     = string
+    zone_id                  = string
+    alternate_hosts          = list(string)
+    minimum_protocol_version = string
+    ssl_support_method       = optional(string, "sni-only")
+    validation_ttl_seconds   = optional(number, 300)
+  })
+  default = null
+}
+
+variable "address_record_types" {
+  description = "The address records made for each host: IPv4 and IPv6."
+  type        = list(string)
+  default     = ["A", "AAAA"]
+}
+
 variable "api_origin" {
   description = "A second origin for the sign-up API, so the browser calls it on the site's own origin. Null leaves the distribution static-only."
   type = object({

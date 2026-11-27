@@ -7,6 +7,9 @@ module "web" {
     aws.storage = aws.storage
     aws.cdn     = aws.cdn
     aws.edge    = aws.edge
+
+    aws.certificates = aws.certificates
+    aws.dns          = aws.dns
   }
 
   platform  = local.platform
@@ -26,6 +29,13 @@ module "web" {
   waf_managed_rule_groups = var.waf_managed_rule_groups
   waf_rate_limit          = var.waf_rate_limit
   waf_rate_rule_priority  = var.waf_rate_rule_priority
+
+  # The site's own name. The name and its zone are shared values, because the
+  # bootstrap stack scopes the dns role to that zone.
+  domain = merge(var.site_domain, {
+    alternate_hosts          = var.site_alternate_hosts
+    minimum_protocol_version = var.site_minimum_protocol_version
+  })
 
   # The API is served on the site's own origin, so the browser needs no CORS
   # and the token never crosses an origin.

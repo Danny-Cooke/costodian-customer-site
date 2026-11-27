@@ -14,8 +14,8 @@ output "distribution_domain_name" {
 }
 
 output "site_url" {
-  description = "Where the site is."
-  value       = "https://${aws_cloudfront_distribution.this.domain_name}"
+  description = "Where the site is: its own name when it has one, the CloudFront domain when it does not."
+  value       = "https://${var.domain == null ? aws_cloudfront_distribution.this.domain_name : var.domain.name}"
 }
 
 output "web_acl_arn" {
