@@ -380,7 +380,7 @@ def load_site(overrides: list[str] | tuple[str, ...] = ()) -> dict[str, Any]:
     # The versions a firm can run begin with the ones the platform starts with.
     site["versions"] = platform[INITIAL_VERSIONS_KEY]
     # A firm's portal is at a name under the site's own domain.
-    site["portal"]["domain"] = platform[SITE_DOMAIN_KEY]["name"]
+    site["customer_portal"]["domain"] = platform[SITE_DOMAIN_KEY]["name"]
     for assignment in overrides:
         apply_override(site, assignment)
     return interpolate(site, Environment(undefined=StrictUndefined), site)

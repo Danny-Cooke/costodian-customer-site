@@ -335,7 +335,7 @@
     "issued": "issued",
     "retired": "retired"
   },
-  "portal": {
+  "customer_portal": {
     "address_format": "https://{uid}.portal.{domain}",
     "port": 443
   },
