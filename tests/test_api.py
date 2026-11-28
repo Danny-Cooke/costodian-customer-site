@@ -209,6 +209,10 @@ def api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(handler, "directory", lambda: handler.people_service)
     monkeypatch.setattr(handler, "parameters", lambda: handler.labels)
     monkeypatch.setattr(handler, "registry", lambda: handler.uids)
+    # No portal has been built unless a test says so; nothing here looks a name up.
+    handler.portals = set()
+    handler.looks_up = handler.has_address
+    monkeypatch.setattr(handler, "has_address", lambda host, port: host in handler.portals)
     CURRENT["directory"] = handler.people_service
     return handler
 
@@ -1046,6 +1050,24 @@ def test_everyone_in_a_firm_sees_the_same_uid(firm: Any) -> None:
     invite(firm)
     alex = member(firm, "alex@example.test")["sub"]
     assert view(firm, alex, "alex@example.test")["uid"] == view(firm)["uid"]
+
+
+def test_the_portal_address_is_given_only_once_the_portal_exists(firm: Any) -> None:
+    uid = view(firm)["uid"]
+    assert view(firm)["portal"] is None
+    domain = firm.config()["portal"]["domain"]
+    firm.portals.add(f"{uid}.portal.{domain}")
+    assert view(firm)["portal"] == f"https://{uid}.portal.{domain}"
+
+
+def test_a_name_that_cannot_be_looked_up_is_not_a_portal(api: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fails(*_: Any) -> Any:
+        raise OSError("no such name")
+
+    monkeypatch.setattr("socket.getaddrinfo", fails)
+    assert api.looks_up("nothing.example.test", 443) is False
+    monkeypatch.setattr("socket.getaddrinfo", lambda *_: [object()])
+    assert api.looks_up("something.example.test", 443) is True
 
 
 def test_a_person_with_no_firm_has_no_uid(api: Any) -> None:

@@ -55,6 +55,7 @@ def api_config(site: dict[str, Any]) -> dict[str, Any]:
     config["customerStatuses"] = site["customer_statuses"]
     config["customerStatusesHeld"] = [site["customer_statuses"][name] for name in site["customer_statuses_held"]]
     config["uid"] = site["uid"]
+    config["portal"] = site["portal"]
     config["registryKeys"] = REGISTRY_KEYS
     config["customerLabel"] = site["customer_label"]
     config["customerLabelAnswers"] = site["customer_label_answers"]

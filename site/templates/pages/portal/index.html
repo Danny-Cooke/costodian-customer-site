@@ -26,6 +26,8 @@
       <h2>Your {{ site.labels.uid }}</h2>
       <p class="uid" data-uid></p>
       <p>This is your firm's {{ site.labels.uid_long }}. It never changes. You will use it, with your email address and password, to sign in to your portal.</p>
+      {# Shown only once the portal has been built and its address exists. #}
+      <p data-portal hidden>{{ site.labels.portal_address }}: <a data-portal-link rel="noopener"></a></p>
     </div>
 
     <div class="panel" data-account>

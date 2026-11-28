@@ -34,8 +34,10 @@ import json
 import os
 import re
 import secrets
+import socket
 import time
 from datetime import UTC, date, datetime
+from urllib.parse import urlsplit
 from decimal import Decimal
 from functools import cache
 from pathlib import Path
@@ -726,6 +728,24 @@ def guarded(handler: Any) -> Any:
     return run
 
 
+def has_address(host: str, port: int) -> bool:
+    """Whether a name exists on the internet. A firm's portal is given its name
+    when it is built, so a name that resolves is a portal that is there."""
+    try:
+        return bool(socket.getaddrinfo(host, port))
+    except OSError:
+        return False
+
+
+def portal_of(uid: str | None) -> str | None:
+    """Where the firm's portal is, once it has been built, and nothing before then."""
+    if not uid:
+        return None
+    settings = config()["portal"]
+    address: str = settings["address_format"].format(uid=uid, domain=settings["domain"])
+    return address if has_address(urlsplit(address).hostname or "", settings["port"]) else None
+
+
 NOBODY: dict[str, Any] = {
     "member": None,
     "signup": None,
@@ -734,6 +754,7 @@ NOBODY: dict[str, Any] = {
     "people": [],
     "changes": [],
     "uid": None,
+    "portal": None,
 }
 
 
@@ -748,6 +769,7 @@ def account_view(person: dict[str, str]) -> dict[str, Any]:
         return {**NOBODY, "versions": versions()}
     details = shared.get(names()["firm"])
     own = one(table, person_partition(person["sub"]), names()["person"]) or {}
+    uid = shared.get(names()["uid"], {}).get("uid")
     return {
         "member": {"role": member["role"], "sub": person["sub"]},
         "signup": {**details, "values": {**details["values"], **own.get("values", {})}} if details else None,
@@ -756,7 +778,8 @@ def account_view(person: dict[str, str]) -> dict[str, Any]:
         "people": people_in(shared),
         "changes": changes_in(shared),
         "versions": versions(),
-        "uid": shared.get(names()["uid"], {}).get("uid"),
+        "uid": uid,
+        "portal": portal_of(uid),
     }
 
 

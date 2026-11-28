@@ -228,7 +228,8 @@
     "blank": "Not given",
     "covered": "Covered",
     "uid": "UID",
-    "uid_long": "unique ID"
+    "uid_long": "unique ID",
+    "portal_address": "Your portal"
   },
   "identity": {
     "person_name_field": "person_name",
@@ -333,6 +334,10 @@
     "attempts": 20,
     "issued": "issued",
     "retired": "retired"
+  },
+  "portal": {
+    "address_format": "https://{uid}.portal.{domain}",
+    "port": 443
   },
   "customer_statuses_held": [
     "left",

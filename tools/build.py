@@ -32,6 +32,7 @@ PLATFORM_FILE_VARIABLE = "PLATFORM_FILE"
 DEFAULT_PLATFORM_FILE = ROOT / "infra" / "envs" / "dev" / "platform.tfvars.json"
 PRODUCT_NAME_KEY = "product_name"
 INITIAL_VERSIONS_KEY = "initial_versions"
+SITE_DOMAIN_KEY = "site_domain"
 # What a kind of account may leave out of its definition in forms.json.
 TYPE_DEFAULTS: dict[str, Any] = {
     "intro": "",
@@ -378,6 +379,8 @@ def load_site(overrides: list[str] | tuple[str, ...] = ()) -> dict[str, Any]:
     site["product"]["name"] = platform[PRODUCT_NAME_KEY]
     # The versions a firm can run begin with the ones the platform starts with.
     site["versions"] = platform[INITIAL_VERSIONS_KEY]
+    # A firm's portal is at a name under the site's own domain.
+    site["portal"]["domain"] = platform[SITE_DOMAIN_KEY]["name"]
     for assignment in overrides:
         apply_override(site, assignment)
     return interpolate(site, Environment(undefined=StrictUndefined), site)
