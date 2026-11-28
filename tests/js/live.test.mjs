@@ -483,7 +483,8 @@ test("my account links to the firm's portal once it exists, and not before", asy
   const page = await openLive("portal", sessionWith(memoryStorage()), net);
   assert.equal(page.one("[data-portal]").hidden, false);
   assert.equal(page.one("[data-portal-link]").getAttribute("href"), address);
-  assert.equal(page.one("[data-portal-link]").textContent, "483920.portal.example.test");
+  assert.equal(page.one("[data-portal-link]").textContent, address, "shown in full, so it is plainly a link");
+  assert.match(page.one("[data-portal] h2").textContent, /portal/i);
 });
 
 test("an address that is not https is never made into a link", async () => {
