@@ -32,6 +32,7 @@ variable "components" {
     ci       = string
     account  = string
     customer = string
+    mail     = string
   })
 }
 

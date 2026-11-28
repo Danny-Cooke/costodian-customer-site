@@ -90,12 +90,13 @@ None of them can do everything:
 | `bootstrap` | OIDC from `dev-bootstrap`, with approval. Created by the seed | the pipeline's own roles and policies, and the state bucket |
 | `plan` | OIDC from `dev-plan` | the read actions of every service, and read of the site state. It can change nothing |
 | `deploy` | OIDC from `dev` | read and write of the site state object and its lock, and `sts:AssumeRole` on the service roles. Nothing else |
-| `storage` | chained from `deploy` | the site bucket, and its objects' deletes so a destroy can empty it |
+| `storage` | chained from `deploy` | the site bucket and the received-mail bucket, and their objects' deletes so a destroy can empty them |
 | `keys` | chained from `deploy` | the sign-up KMS key and alias |
 | `edge` | chained from `deploy` | CloudFront and the web ACL, and sight of the certificate |
 | `certificates` | chained from `deploy` | the site's certificate, in the edge Region |
 | `dns` | chained from `deploy` | records in the site's own hosted zone, and no other zone |
-| `email` | chained from `deploy` | the domain's sending identity in SES and its configuration set. It cannot send |
+| `email` | chained from `deploy` | the domain's sending identity in SES, its configuration set and the rules for received mail. It cannot send or read |
+| `notifications` | chained from `deploy` | the topic that passes received mail on |
 | `identity` | chained from `deploy` | the Cognito pool and client, and telling the pool to send through the domain's identity |
 | `data` | chained from `deploy` | the account table |
 | `compute` | chained from `deploy` | the functions, the HTTP API, the log groups |
