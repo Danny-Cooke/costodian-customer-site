@@ -377,10 +377,25 @@ variable "user_pool_deletion_protection" {
   type        = string
 }
 
-variable "email_sending_account" {
-  description = "COGNITO_DEFAULT uses Cognito's own sender and its low daily limit; DEVELOPER uses SES."
-  type        = string
-  default     = "COGNITO_DEFAULT"
+variable "email_sender" {
+  description = "Who the sign-in pool's emails come from: the SES identity it sends as and the From line. Null leaves Cognito's own sender, with its low daily limit and its own address."
+  type = object({
+    identity_arn = string
+    from         = string
+  })
+  default = null
+}
+
+variable "email_sending_accounts" {
+  description = "Cognito's two names for who sends: its own sender, or SES."
+  type = object({
+    cognito = string
+    ses     = string
+  })
+  default = {
+    cognito = "COGNITO_DEFAULT"
+    ses     = "DEVELOPER"
+  }
 }
 
 variable "client_auth_flows" {

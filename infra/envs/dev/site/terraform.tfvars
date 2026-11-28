@@ -40,6 +40,25 @@ waf_managed_rule_groups = [
 waf_rate_limit         = 2000
 waf_rate_rule_priority = 10
 
+# ------------------------------------------------------------------- mail
+#
+# Only SES sends as the domain, and it signs what it sends, so anything else
+# claiming to be from it is to be treated as suspect.
+mail_dmarc_record = "v=DMARC1; p=quarantine; adkim=r; aspf=r"
+mail_spf_record   = "v=spf1 include:amazonses.com ~all"
+
+# A received message is an AWS notice about an account, or a reply to one of
+# the site's own emails. A little over a year.
+mail_retention_days = 400
+
+# The site's emails come from this address at the domain. Not yet: SES starts
+# an account able to send only to addresses it has verified, and turning this
+# on before AWS lifts that would stop every sign-up email.
+site_sender = {
+  local_part = "customer-site"
+  enabled    = false
+}
+
 # The short address on the main website. It is a redirect made there, by hand.
 redirect_path = "/draft_cs_site"
 

@@ -43,6 +43,36 @@ variable "site_minimum_protocol_version" {
   type        = string
 }
 
+variable "mail_forward_to" {
+  description = "The mailbox mail received at the domain is passed on to. Given by the pipeline from a repository secret; empty passes it on to nobody."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "mail_dmarc_record" {
+  description = "The domain's DMARC policy, as the record's value."
+  type        = string
+}
+
+variable "mail_spf_record" {
+  description = "Who may send with the domain's return path, as the record's value."
+  type        = string
+}
+
+variable "mail_retention_days" {
+  description = "Days a received message is kept."
+  type        = number
+}
+
+variable "site_sender" {
+  description = "The address the site's own emails come from, and whether the sign-in pool uses it yet."
+  type = object({
+    local_part = string
+    enabled    = bool
+  })
+}
+
 variable "cloudfront_price_class" {
   description = "CloudFront price class."
   type        = string

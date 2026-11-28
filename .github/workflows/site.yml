@@ -187,6 +187,10 @@ jobs:
       - name: Terraform plan
         working-directory: ${{ env.STACK_DIR }}
         # The plan job's role is read-only and is used directly.
+        env:
+          # Where mail received at the domain is passed on to. A secret, so it is
+          # never in the repository or a log; unset passes it on to nobody.
+          TF_VAR_mail_forward_to: ${{ secrets.MAIL_FORWARD_TO }}
         run: terraform plan -var-file="$PLATFORM_VARS" -var="assume_service_roles=false"
 
   deploy:
@@ -233,6 +237,10 @@ jobs:
         working-directory: ${{ env.STACK_DIR }}
         # The deploy role can do nothing itself: each provider assumes the role
         # for its own service.
+        env:
+          # Where mail received at the domain is passed on to. A secret, so it is
+          # never in the repository or a log; unset passes it on to nobody.
+          TF_VAR_mail_forward_to: ${{ secrets.MAIL_FORWARD_TO }}
         run: terraform apply -auto-approve -var-file="$PLATFORM_VARS" -var="assume_service_roles=true"
 
       - name: Read the stack outputs
