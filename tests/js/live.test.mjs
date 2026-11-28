@@ -474,6 +474,25 @@ test("my account shows the UID the firm signs in to its portal with, and never t
   assert.equal(net.requests.length, 1, "a customer who has a UID is not asked for one again");
 });
 
+test("my account links to the firm's portal once it exists, and not before", async () => {
+  const before = await openLive("portal", sessionWith(memoryStorage()), network({ [`GET ${data.api.account}`]: () => accountOf(OWNER) }));
+  assert.equal(before.one("[data-portal]").hidden, true);
+
+  const address = "https://483920.portal.example.test";
+  const net = network({ [`GET ${data.api.account}`]: () => accountOf(OWNER, { portal: address }) });
+  const page = await openLive("portal", sessionWith(memoryStorage()), net);
+  assert.equal(page.one("[data-portal]").hidden, false);
+  assert.equal(page.one("[data-portal-link]").getAttribute("href"), address);
+  assert.equal(page.one("[data-portal-link]").textContent, "483920.portal.example.test");
+});
+
+test("an address that is not https is never made into a link", async () => {
+  const net = network({ [`GET ${data.api.account}`]: () => accountOf(OWNER, { portal: "javascript:alert(1)" }) });
+  const page = await openLive("portal", sessionWith(memoryStorage()), net);
+  assert.equal(page.one("[data-portal]").hidden, true);
+  assert.equal(page.one("[data-portal-link]").getAttribute("href"), null);
+});
+
 test("a customer from before UIDs is given one when they sign in", async () => {
   let issued = false;
   const net = network({

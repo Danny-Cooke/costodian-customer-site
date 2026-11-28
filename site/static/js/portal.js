@@ -30,6 +30,16 @@ const uidPanel = document.querySelector("[data-uid-panel]");
 uidPanel.querySelector("[data-uid]").textContent = uid ?? "";
 uidPanel.hidden = !uid;
 
+// The portal's address, once the portal exists. Only an https address the API
+// gave is ever made into a link.
+const portal = account?.state().portal;
+const portalRow = uidPanel.querySelector("[data-portal]");
+const portalLink = portalRow.querySelector("[data-portal-link]");
+const shown = typeof portal === "string" && portal.startsWith("https://");
+portalLink.textContent = shown ? portal.slice("https://".length) : "";
+if (shown) portalLink.href = portal;
+portalRow.hidden = !shown;
+
 const panel = document.querySelector("[data-account]");
 panel.querySelector('[data-when="checking"]').hidden = Boolean(account);
 panel.querySelector('[data-when="waiting"]').hidden = !account || status.ready;
