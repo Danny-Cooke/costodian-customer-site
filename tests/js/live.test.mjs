@@ -485,6 +485,8 @@ test("my account links to the firm's portal once it exists, and not before", asy
   assert.equal(page.one("[data-portal-link]").getAttribute("href"), address);
   assert.equal(page.one("[data-portal-link]").textContent, address, "shown in full, so it is plainly a link");
   assert.match(page.one("[data-portal] h2").textContent, /portal/i);
+  assert.equal(page.one("[data-portal-link]").getAttribute("target"), "_blank", "the portal opens in a tab of its own");
+  assert.equal(page.one("[data-portal-link]").getAttribute("rel"), "noopener");
 });
 
 test("an address that is not https is never made into a link", async () => {
