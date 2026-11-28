@@ -241,8 +241,8 @@ temporary_password_validity_days = 7
 # service still requires the wording to exist.
 invite_message_template = {
   sms     = "{product}: sign in as {username} with the temporary password {####}"
-  subject = "You have been invited to {product}"
-  message = "You have been invited to help manage your firm's {product} account.<br><br>Sign in at {site_url}/signin/ with:<br><br>Email address: {username}<br>Temporary password: {####}<br><br>You will be asked to choose your own password the first time you sign in. The temporary password stops working after {days} days."
+  subject = "Your invitation to the {product} customer site"
+  message = "You have been invited to the {product} customer site, where your firm's {product} account is managed. This is not your firm's case portal, which sends its own invitation.<br><br>Sign in at {site_url}/signin/ with:<br><br>Email address: {username}<br>Temporary password: {####}<br><br>You will be asked to choose your own password the first time you sign in. The temporary password stops working after {days} days."
 }
 
 # The email that carries a code says which site it is for, why it was sent and
