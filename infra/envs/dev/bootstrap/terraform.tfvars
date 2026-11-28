@@ -62,10 +62,10 @@ publish_service = "publish"
 service_roles = {
   # ------------------------------------------------------------------ storage
   storage = {
-    description = "Creates and configures the site bucket, and empties it when the site is destroyed. Publishing is a different role."
+    description = "Creates and configures the site bucket and the bucket received mail is kept in, and empties them when the site is destroyed. It cannot read a file in either."
     statements = {
       web_bucket = {
-        resources = ["web_bucket"]
+        resources = ["web_bucket", "mail_bucket"]
         # The provider reads every one of these on each refresh of
         # aws_s3_bucket and its configuration resources, whether or not this
         # stack sets them.
@@ -108,7 +108,7 @@ service_roles = {
       # Terraform does itself when web_bucket_force_destroy is set. It cannot
       # read or write a site file: that is the publish role's work.
       web_bucket_objects = {
-        resources    = ["web_bucket_objects"]
+        resources    = ["web_bucket_objects", "mail_bucket_objects"]
         read_actions = []
         write_actions = [
           "s3:DeleteObject",
@@ -152,7 +152,7 @@ service_roles = {
       # The sign-up component's alias and every customer's. An alias can be
       # named, so it is, and the same three calls serve both.
       aliases = {
-        resources     = ["account_alias", "customer_alias"]
+        resources     = ["account_alias", "customer_alias", "mail_alias"]
         read_actions  = []
         write_actions = ["kms:CreateAlias", "kms:DeleteAlias", "kms:UpdateAlias"]
       }
@@ -337,7 +337,7 @@ service_roles = {
 
   # -------------------------------------------------------------------- email
   email = {
-    description = "Creates the domain's sending identity in SES, its signing and return-path settings, and its configuration set. It cannot send an email."
+    description = "Creates the domain's sending identity in SES, its signing and return-path settings, its configuration set, and the rules for mail the domain receives. It cannot send or read an email."
     statements = {
       identity = {
         resources = ["email_identity"]
@@ -382,6 +382,26 @@ service_roles = {
           "ses:UpdateConfigurationSetEventDestination",
         ]
       }
+      # What happens to mail the domain receives. A receipt rule and its rule
+      # set cannot be named in a policy: SES accepts no resource for them.
+      receiving = {
+        resources = ["unscopable"]
+        read_actions = [
+          "ses:DescribeActiveReceiptRuleSet",
+          "ses:DescribeReceiptRule",
+          "ses:DescribeReceiptRuleSet",
+          "ses:ListReceiptRuleSets",
+        ]
+        write_actions = [
+          "ses:CreateReceiptRule",
+          "ses:CreateReceiptRuleSet",
+          "ses:DeleteReceiptRule",
+          "ses:DeleteReceiptRuleSet",
+          "ses:SetActiveReceiptRuleSet",
+          "ses:SetReceiptRulePosition",
+          "ses:UpdateReceiptRule",
+        ]
+      }
       # The account's sending status and the list calls take no resource.
       email_listing = {
         resources = ["unscopable"]
@@ -390,6 +410,43 @@ service_roles = {
           "ses:ListConfigurationSets",
           "ses:ListEmailIdentities",
         ]
+        write_actions = []
+      }
+    }
+  }
+
+  # ------------------------------------------------------------ notifications
+  notifications = {
+    description = "Creates the topic that passes received mail on, and who it is passed to."
+    statements = {
+      mail_topics = {
+        resources = ["mail_topics"]
+        read_actions = [
+          "sns:GetDataProtectionPolicy",
+          "sns:GetTopicAttributes",
+          "sns:ListSubscriptionsByTopic",
+          "sns:ListTagsForResource",
+        ]
+        write_actions = [
+          "sns:CreateTopic",
+          "sns:DeleteTopic",
+          "sns:SetTopicAttributes",
+          "sns:Subscribe",
+          "sns:TagResource",
+          "sns:UntagResource",
+        ]
+      }
+      # SNS accepts no resource for a call on a subscription.
+      subscriptions = {
+        resources     = ["unscopable"]
+        read_actions  = ["sns:GetSubscriptionAttributes", "sns:ListTopics"]
+        write_actions = ["sns:SetSubscriptionAttributes", "sns:Unsubscribe"]
+      }
+      # A topic encrypted with the mail key: SNS checks that whoever creates it
+      # can see the key.
+      topic_key = {
+        resources     = ["any_key"]
+        read_actions  = ["kms:DescribeKey"]
         write_actions = []
       }
     }
