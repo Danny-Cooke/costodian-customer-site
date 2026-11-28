@@ -36,7 +36,8 @@ const portal = account?.state().portal;
 const portalRow = uidPanel.querySelector("[data-portal]");
 const portalLink = portalRow.querySelector("[data-portal-link]");
 const shown = typeof portal === "string" && portal.startsWith("https://");
-portalLink.textContent = shown ? portal.slice("https://".length) : "";
+// Shown in full, https and all, so that it is plainly a link.
+portalLink.textContent = shown ? portal : "";
 if (shown) portalLink.href = portal;
 portalRow.hidden = !shown;
 

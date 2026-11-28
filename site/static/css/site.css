@@ -918,3 +918,14 @@ input.short {
   letter-spacing: 0.12em;
   margin: 0.25rem 0 0.5rem;
 }
+
+/* The portal's address, the same size and weight as the UID above it. An
+   address is not spaced out like a number, and may wrap on a narrow screen. */
+.uid.address {
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.uid.address a {
+  text-decoration: underline;
+}
