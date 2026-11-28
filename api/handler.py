@@ -37,11 +37,11 @@ import secrets
 import socket
 import time
 from datetime import UTC, date, datetime
-from urllib.parse import urlsplit
 from decimal import Decimal
 from functools import cache
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import validation
 
