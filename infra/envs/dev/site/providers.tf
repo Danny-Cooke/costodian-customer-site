@@ -141,6 +141,42 @@ provider "aws" {
 }
 
 provider "aws" {
+  alias  = "email"
+  region = var.platform.region
+
+  dynamic "assume_role" {
+    for_each = local.assumed["email"]
+
+    content {
+      role_arn     = assume_role.value
+      session_name = local.assume_session_name
+    }
+  }
+
+  default_tags {
+    tags = local.default_tags
+  }
+}
+
+provider "aws" {
+  alias  = "notifications"
+  region = var.platform.region
+
+  dynamic "assume_role" {
+    for_each = local.assumed["notifications"]
+
+    content {
+      role_arn     = assume_role.value
+      session_name = local.assume_session_name
+    }
+  }
+
+  default_tags {
+    tags = local.default_tags
+  }
+}
+
+provider "aws" {
   alias  = "identity"
   region = var.platform.region
 

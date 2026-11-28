@@ -337,7 +337,9 @@ resource "aws_cognito_user_pool" "this" {
   # Cognito's own sender, with its low daily limit. Moving to SES is a change
   # of email_sending_account and a verified identity.
   email_configuration {
-    email_sending_account = var.email_sending_account
+    email_sending_account = var.email_sender == null ? var.email_sending_accounts.cognito : var.email_sending_accounts.ses
+    source_arn            = var.email_sender == null ? null : var.email_sender.identity_arn
+    from_email_address    = var.email_sender == null ? null : var.email_sender.from
   }
 
   tags = merge(local.tags, { Name = module.naming.names["pool"] })

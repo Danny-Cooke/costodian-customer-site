@@ -45,6 +45,31 @@ module "web" {
   }
 }
 
+# Mail for the site's domain: the sending identity, and somewhere for mail to
+# the domain to arrive.
+module "mail" {
+  source = "../../../modules/mail"
+
+  providers = {
+    aws.email         = aws.email
+    aws.dns           = aws.dns
+    aws.keys          = aws.keys
+    aws.storage       = aws.storage
+    aws.notifications = aws.notifications
+  }
+
+  platform  = local.platform
+  component = var.components.mail
+
+  domain            = var.site_domain
+  forward_to        = var.mail_forward_to
+  dmarc_record      = var.mail_dmarc_record
+  spf_record        = var.mail_spf_record
+  retention_days    = var.mail_retention_days
+  key_admin_actions = var.key_admin_actions
+  force_destroy     = var.web_bucket_force_destroy
+}
+
 module "account" {
   source = "../../../modules/account"
 
@@ -67,6 +92,13 @@ module "account" {
   # the three order themselves and there is no cycle.
   product_name = var.product_name
   site_url     = module.web.site_url
+
+  # Off until AWS has let this account send to anyone: until then SES delivers
+  # only to addresses it has verified, and nobody could sign up.
+  email_sender = var.site_sender.enabled ? {
+    identity_arn = module.mail.identity_arn
+    from         = "${var.product_name} <${var.site_sender.local_part}@${var.site_domain.name}>"
+  } : null
 
   function_permissions_boundary_arn = local.function_permissions_boundary_arn
 
